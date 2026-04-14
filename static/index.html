@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrepPath — Home</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <span class="text-xl font-bold text-indigo-600">PrepPath</span>
+    <span class="text-sm text-gray-400">Candidate Portal</span>
+  </nav>
+
+  <div class="max-w-3xl mx-auto px-4 py-10">
+
+    <!-- Profile card -->
+    <div class="bg-white rounded-2xl shadow p-6 mb-6">
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center text-2xl font-bold text-indigo-600" id="avatar">?</div>
+        <div>
+          <h1 class="text-xl font-semibold text-gray-800" id="candidate-name">Loading…</h1>
+          <p class="text-sm text-gray-500" id="candidate-email"></p>
+        </div>
+        <div class="ml-auto text-right">
+          <span id="channel-badge" class="px-3 py-1 rounded-full text-xs font-semibold"></span>
+          <p class="text-xs text-gray-400 mt-1" id="level-label"></p>
+        </div>
+      </div>
+
+      <!-- Interview ready banner -->
+      <div id="ready-banner" class="hidden bg-green-50 border border-green-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+        <span class="text-2xl">🎉</span>
+        <div>
+          <p class="font-semibold text-green-800">Interview Ready!</p>
+          <p class="text-sm text-green-600">You've reached the Interview Simulation channel. You're ready for real interviews.</p>
+        </div>
+      </div>
+
+      <!-- Scores if available -->
+      <div id="scores-section" class="hidden grid grid-cols-3 gap-3 mb-4"></div>
+    </div>
+
+    <!-- Action cards -->
+    <div class="grid gap-4">
+
+      <!-- Preliminary test card (shown only if not taken) -->
+      <div id="prelim-card" class="hidden bg-white rounded-2xl shadow p-6 border-l-4 border-yellow-400">
+        <h2 class="font-semibold text-gray-800 mb-1">Step 1: Preliminary Assessment</h2>
+        <p class="text-sm text-gray-500 mb-4">A short test to calibrate your starting level and learning plan.</p>
+        <a href="/static/test.html" class="inline-block bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold px-5 py-2 rounded-lg transition">Take Assessment →</a>
+      </div>
+
+      <!-- Mentor sessions card -->
+      <div id="mentor-card" class="hidden bg-white rounded-2xl shadow p-6 border-l-4 border-indigo-400">
+        <h2 class="font-semibold text-gray-800 mb-2">Mentor Sessions</h2>
+        <p class="text-sm text-gray-500 mb-4">Choose a section to practice with your AI mentor.</p>
+        <div id="section-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Progress card -->
+      <div id="progress-card" class="hidden bg-white rounded-2xl shadow p-6 border-l-4 border-green-400">
+        <h2 class="font-semibold text-gray-800 mb-1">View Progress</h2>
+        <p class="text-sm text-gray-500 mb-4">See covered concepts, gaps, strengths, and your current standing.</p>
+        <a href="/static/progress.html" class="inline-block bg-green-500 hover:bg-green-600 text-white font-semibold px-5 py-2 rounded-lg transition">View Progress →</a>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const CANDIDATE_ID = 1;
+
+    const CHANNEL_STYLES = {
+      foundation:  { label: 'Foundation',        bg: 'bg-blue-100 text-blue-700' },
+      deepdive:    { label: 'Deep Dive',          bg: 'bg-purple-100 text-purple-700' },
+      simulation:  { label: 'Interview Sim',      bg: 'bg-green-100 text-green-700' },
+      improvement: { label: 'Improvement',        bg: 'bg-orange-100 text-orange-700' },
+      '':          { label: 'Not started',        bg: 'bg-gray-100 text-gray-500' },
+    };
+
+    async function load() {
+      const [candRes, progRes] = await Promise.all([
+        fetch(`/candidates/${CANDIDATE_ID}`),
+        fetch(`/candidates/${CANDIDATE_ID}/progress`),
+      ]);
+      const cand = await candRes.json();
+      const prog = await progRes.json();
+
+      // Profile
+      document.getElementById('candidate-name').textContent = cand.name;
+      document.getElementById('candidate-email').textContent = cand.email;
+      document.getElementById('avatar').textContent = cand.name[0].toUpperCase();
+
+      // Channel badge
+      const cs = CHANNEL_STYLES[cand.channel] || CHANNEL_STYLES[''];
+      const badge = document.getElementById('channel-badge');
+      badge.textContent = cs.label;
+      badge.className = `px-3 py-1 rounded-full text-xs font-semibold ${cs.bg}`;
+      document.getElementById('level-label').textContent = cand.level ? `Level: ${cand.level}` : '';
+
+      // Interview ready
+      if (cand.interview_ready) {
+        document.getElementById('ready-banner').classList.remove('hidden');
+      }
+
+      // Show prelim card or mentor card
+      if (!cand.plan_id) {
+        document.getElementById('prelim-card').classList.remove('hidden');
+      } else {
+        document.getElementById('mentor-card').classList.remove('hidden');
+        document.getElementById('progress-card').classList.remove('hidden');
+        renderSections(prog.sections, prog.completed_section_ids, cand.channel);
+      }
+    }
+
+    function renderSections(sections, completedIds, channel) {
+      const container = document.getElementById('section-list');
+      container.innerHTML = '';
+
+      sections.forEach(sec => {
+        const done = completedIds.includes(sec.id);
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between bg-gray-50 rounded-xl p-3';
+
+        const label = document.createElement('div');
+        label.innerHTML = `
+          <p class="font-medium text-gray-700">${sec.name}</p>
+          <p class="text-xs text-gray-400">${sec.concepts.join(' · ')}</p>
+        `;
+
+        const action = document.createElement('div');
+        if (done) {
+          action.innerHTML = `<span class="text-green-500 text-sm font-medium">✓ Done</span>`;
+        } else {
+          action.innerHTML = `
+            <a href="/static/chat.html?section_id=${sec.id}&candidate_id=${CANDIDATE_ID}"
+               class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition">
+              ${channel === 'simulation' ? 'Mock Interview' : 'Start Session'} →
+            </a>
+          `;
+        }
+
+        div.appendChild(label);
+        div.appendChild(action);
+        container.appendChild(div);
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>

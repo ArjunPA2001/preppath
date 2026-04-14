@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrepPath — Mentor Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #messages { scroll-behavior: smooth; }
+    .bubble-user { background: #6366f1; color: white; border-radius: 1.25rem 1.25rem 0.25rem 1.25rem; }
+    .bubble-mentor { background: white; color: #1f2937; border-radius: 1.25rem 1.25rem 1.25rem 0.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .typing-dot { animation: blink 1.2s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: .2s; }
+    .typing-dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+  </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col">
+
+  <!-- Nav -->
+  <nav class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <a href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
+      <div>
+        <span class="font-semibold text-gray-800" id="section-title">Loading…</span>
+        <span id="channel-badge" class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500"></span>
+      </div>
+    </div>
+    <button id="end-btn"
+      class="text-sm text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition">
+      End Session
+    </button>
+  </nav>
+
+  <!-- Current question card -->
+  <div class="flex-shrink-0 bg-indigo-50 border-b border-indigo-100 px-4 py-3">
+    <div class="max-w-3xl mx-auto">
+      <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-1">
+        Current concept: <span id="current-concept">—</span>
+      </p>
+      <p class="text-sm text-indigo-800 leading-snug" id="current-question">Your session is starting…</p>
+    </div>
+  </div>
+
+  <!-- Gate progress bar -->
+  <div class="flex-shrink-0 bg-white border-b border-gray-100 px-4 py-2">
+    <div class="max-w-3xl mx-auto flex items-center gap-3">
+      <span class="text-xs text-gray-400 whitespace-nowrap">Section progress</span>
+      <div class="flex-1 flex gap-1.5" id="concept-pills"></div>
+      <span class="text-xs text-gray-400" id="answer-count">0 answered</span>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div id="messages" class="flex-1 overflow-y-auto px-4 py-4">
+    <div class="max-w-3xl mx-auto space-y-4" id="message-list">
+      <div class="text-center text-xs text-gray-400 py-4">Session started — your mentor is ready.</div>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="flex-shrink-0 bg-white border-t border-gray-200 px-4 py-3">
+    <div class="max-w-3xl mx-auto flex gap-2">
+      <textarea
+        id="user-input"
+        rows="2"
+        placeholder="Type your answer or question…"
+        class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
+      ></textarea>
+      <button id="send-btn"
+        class="bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-200 text-white font-semibold px-5 rounded-xl transition flex items-center">
+        Send
+      </button>
+    </div>
+  </div>
+
+  <!-- Gate fired toast -->
+  <div id="gate-toast" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-2xl shadow-lg text-sm font-medium z-50"></div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const SECTION_ID = parseInt(params.get('section_id')) || 1;
+    const CANDIDATE_ID = parseInt(params.get('candidate_id')) || 1;
+
+    const CHANNEL_STYLES = {
+      foundation:  'bg-blue-100 text-blue-700',
+      deepdive:    'bg-purple-100 text-purple-700',
+      simulation:  'bg-green-100 text-green-700',
+      improvement: 'bg-orange-100 text-orange-700',
+    };
+
+    let sessionId = null;
+    let isLoading = false;
+    let requiredConcepts = [];
+    let coveredConcepts = [];
+
+    // ── Session init ────────────────────────────────────────────────────────
+
+    async function initSession() {
+      const res = await fetch('/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: CANDIDATE_ID, section_id: SECTION_ID }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        appendMessage('mentor', `Could not start session: ${err.detail}`);
+        return;
+      }
+      const data = await res.json();
+      sessionId = data.session_id;
+      requiredConcepts = data.required_concepts || [];
+      coveredConcepts = [];
+
+      document.getElementById('section-title').textContent = data.section?.name || 'Mentor Session';
+
+      // Fetch candidate for channel badge
+      const cRes = await fetch(`/candidates/${CANDIDATE_ID}`);
+      const cand = await cRes.json();
+      const badge = document.getElementById('channel-badge');
+      badge.textContent = cand.channel || '';
+      badge.className = `ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${CHANNEL_STYLES[cand.channel] || 'bg-gray-100 text-gray-500'}`;
+
+      if (data.first_question) {
+        updateQuestionCard(data.first_question);
+      }
+
+      // Show the mentor's opening message so the candidate doesn't have to go first
+      if (data.opening_message) {
+        appendMessage('mentor', data.opening_message);
+      }
+
+      renderConceptPills();
+    }
+
+    // ── UI helpers ──────────────────────────────────────────────────────────
+
+    function updateQuestionCard(q) {
+      document.getElementById('current-concept').textContent = q.concept_tag.replace(/_/g,' ');
+      document.getElementById('current-question').textContent = q.text;
+    }
+
+    function renderConceptPills() {
+      const container = document.getElementById('concept-pills');
+      container.innerHTML = '';
+      requiredConcepts.forEach(c => {
+        const covered = coveredConcepts.includes(c);
+        const pill = document.createElement('span');
+        pill.className = `text-xs px-2 py-0.5 rounded-full transition ${covered ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`;
+        pill.textContent = c.replace(/_/g,' ');
+        container.appendChild(pill);
+      });
+    }
+
+    function setLoading(val) {
+      isLoading = val;
+      document.getElementById('send-btn').disabled = val;
+      document.getElementById('user-input').disabled = val;
+    }
+
+    function appendMessage(role, text) {
+      const list = document.getElementById('message-list');
+      const row = document.createElement('div');
+      row.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-[80%] px-4 py-3 text-sm leading-relaxed ${role === 'user' ? 'bubble-user' : 'bubble-mentor'}`;
+      bubble.textContent = text;
+
+      row.appendChild(bubble);
+      list.appendChild(row);
+      document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+
+      return bubble; // return for streaming update
+    }
+
+    function showTypingIndicator() {
+      const list = document.getElementById('message-list');
+      const row = document.createElement('div');
+      row.className = 'flex justify-start';
+      row.id = 'typing-indicator';
+
+      row.innerHTML = `
+        <div class="bubble-mentor px-4 py-3 flex gap-1 items-center">
+          <span class="typing-dot w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+          <span class="typing-dot w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+          <span class="typing-dot w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+        </div>
+      `;
+      list.appendChild(row);
+      document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      document.getElementById('typing-indicator')?.remove();
+    }
+
+    function showToast(msg, color = 'bg-green-600') {
+      const toast = document.getElementById('gate-toast');
+      toast.className = `fixed bottom-24 left-1/2 -translate-x-1/2 ${color} text-white px-6 py-3 rounded-2xl shadow-lg text-sm font-medium z-50`;
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+
+    // ── Send message ────────────────────────────────────────────────────────
+
+    async function sendMessage() {
+      const input = document.getElementById('user-input');
+      const text = input.value.trim();
+      if (!text || isLoading || !sessionId) return;
+
+      input.value = '';
+      setLoading(true);
+      appendMessage('user', text);
+      showTypingIndicator();
+
+      try {
+        const res = await fetch(`/sessions/${sessionId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate_id: CANDIDATE_ID, message: text }),
+        });
+
+        removeTypingIndicator();
+
+        if (!res.ok) {
+          appendMessage('mentor', 'Something went wrong. Please try again.');
+          return;
+        }
+
+        const responseText = await res.text();
+
+        // Parse [META] block
+        const metaMatch = responseText.match(/\[META\]([\s\S]*?)\[\/META\]/);
+        let meta = null;
+        if (metaMatch) {
+          try { meta = JSON.parse(metaMatch[1]); } catch {}
+        }
+
+        // Clean response text
+        const cleanText = responseText
+          .replace(/\[META\][\s\S]*?\[\/META\]/, '')
+          .replace(/\[ERROR\][\s\S]*?\[\/ERROR\]/, '')
+          .trim();
+
+        if (cleanText) {
+          appendMessage('mentor', cleanText);
+        }
+
+        // Handle metadata
+        if (meta) {
+          document.getElementById('answer-count').textContent = `${meta.answer_count} answered`;
+
+          if (meta.covered_concepts) {
+            coveredConcepts = meta.covered_concepts;
+            renderConceptPills();
+          }
+
+          if (meta.next_question) {
+            updateQuestionCard(meta.next_question);
+          }
+
+          if (meta.gate_fired) {
+            showToast('Section complete! Take the advancement test to move up.', 'bg-indigo-600');
+
+            // Disable input
+            setTimeout(() => {
+              setLoading(true);
+              document.getElementById('user-input').placeholder = 'Session complete.';
+            }, 500);
+
+            // Show advancement test button
+            if (meta.advancement_assessment_id) {
+              setTimeout(() => {
+                const list = document.getElementById('message-list');
+                const row = document.createElement('div');
+                row.className = 'flex justify-center py-4';
+                row.innerHTML = `
+                  <a href="/static/test.html?assessment_id=${meta.advancement_assessment_id}&candidate_id=${CANDIDATE_ID}&type=topic_gate"
+                     class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-8 py-3 rounded-xl shadow transition text-sm">
+                    Take Advancement Test →
+                  </a>
+                `;
+                list.appendChild(row);
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+              }, 800);
+            }
+          }
+        }
+
+      } catch (err) {
+        removeTypingIndicator();
+        appendMessage('mentor', 'Connection error. Please try again.');
+        console.error(err);
+      } finally {
+        if (!isLoading || true) setLoading(false);
+      }
+    }
+
+    // ── Event listeners ─────────────────────────────────────────────────────
+
+    document.getElementById('send-btn').addEventListener('click', sendMessage);
+
+    document.getElementById('user-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    document.getElementById('end-btn').addEventListener('click', async () => {
+      if (!sessionId) return;
+      if (!confirm('End this session?')) return;
+      await fetch(`/sessions/${sessionId}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: CANDIDATE_ID }),
+      });
+      window.location.href = '/static/progress.html';
+    });
+
+    // ── Init ────────────────────────────────────────────────────────────────
+    initSession();
+  </script>
+</body>
+</html>

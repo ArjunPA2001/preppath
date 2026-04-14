@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrepPath — Preliminary Assessment</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
+    <a href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
+    <span class="text-lg font-bold text-indigo-600" id="nav-title">Assessment</span>
+  </nav>
+
+  <!-- PHASE: loading -->
+  <div id="phase-loading" class="max-w-2xl mx-auto px-4 py-20 text-center">
+    <div class="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+    <p class="text-gray-500">Preparing your assessment…</p>
+  </div>
+
+  <!-- PHASE: questions -->
+  <div id="phase-questions" class="hidden max-w-2xl mx-auto px-4 py-10">
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-gray-800">Question <span id="q-current">1</span> of <span id="q-total">6</span></h1>
+        <p class="text-sm text-gray-400" id="q-concept"></p>
+      </div>
+      <!-- Progress bar -->
+      <div class="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div id="progress-bar" class="h-full bg-indigo-500 transition-all" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow p-6 mb-4">
+      <p class="text-gray-700 leading-relaxed text-base" id="q-text"></p>
+    </div>
+
+    <textarea
+      id="answer-input"
+      rows="6"
+      placeholder="Type your answer here…"
+      class="w-full border border-gray-200 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none mb-4"
+    ></textarea>
+
+    <button id="next-btn"
+      class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-xl transition">
+      Next Question →
+    </button>
+  </div>
+
+  <!-- PHASE: submitting -->
+  <div id="phase-submitting" class="hidden max-w-2xl mx-auto px-4 py-20 text-center">
+    <div class="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+    <p class="text-gray-700 font-medium mb-1">Evaluating your answers…</p>
+    <p class="text-sm text-gray-400">This takes about 10 seconds.</p>
+  </div>
+
+  <!-- PHASE: results -->
+  <div id="phase-results" class="hidden max-w-2xl mx-auto px-4 py-10">
+    <div class="bg-white rounded-2xl shadow p-6 mb-4">
+      <h2 class="text-xl font-bold text-gray-800 mb-1">Assessment Complete</h2>
+      <p class="text-sm text-gray-500 mb-4" id="results-subtitle">Your personalised learning plan is ready.</p>
+
+      <!-- Channel assignment -->
+      <div class="rounded-xl p-4 mb-4" id="channel-result-box">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-1" id="channel-label-sm"></p>
+        <p class="text-2xl font-bold" id="channel-name"></p>
+        <p class="text-sm mt-1" id="channel-desc"></p>
+      </div>
+
+      <!-- Scores -->
+      <div class="grid grid-cols-3 gap-3 mb-4" id="scores-grid"></div>
+
+      <!-- Feedback -->
+      <div class="bg-gray-50 rounded-xl p-4 mb-4">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Feedback</p>
+        <p class="text-sm text-gray-700" id="feedback-text"></p>
+      </div>
+
+      <!-- Gaps & Strengths -->
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div>
+          <p class="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Areas to improve</p>
+          <div id="gaps-list" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-green-600 uppercase tracking-wide mb-2">Strengths</p>
+          <div id="strengths-list" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <a href="/static/index.html"
+         class="block w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-xl transition">
+        Continue to Mentoring →
+      </a>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(location.search);
+    const CANDIDATE_ID = parseInt(urlParams.get('candidate_id')) || 1;
+    const ASSESSMENT_ID_PARAM = urlParams.get('assessment_id');
+    const TEST_TYPE = urlParams.get('type') || 'preliminary_test';
+    const IS_ADVANCEMENT = TEST_TYPE === 'topic_gate';
+
+    const CHANNEL_INFO = {
+      foundation:  { label: 'Foundation Channel',       desc: 'Focus on building core concepts with no time pressure.', bg: 'bg-blue-50 text-blue-800' },
+      deepdive:    { label: 'Deep Dive Channel',        desc: 'You\'re ready to go deeper — trade-offs, edge cases, and design.', bg: 'bg-purple-50 text-purple-800' },
+      simulation:  { label: 'Interview Simulation',     desc: 'You\'re at interview-ready level. Full mock interview format.', bg: 'bg-green-50 text-green-800' },
+      improvement: { label: 'Improvement Mode',         desc: 'Targeted remediation on specific weak areas.', bg: 'bg-orange-50 text-orange-800' },
+    };
+
+    let assessmentId = null;
+    let questions = [];
+    let answers = [];
+    let currentIndex = 0;
+
+    function show(phase) {
+      ['loading','questions','submitting','results'].forEach(p => {
+        document.getElementById(`phase-${p}`).classList.add('hidden');
+      });
+      document.getElementById(`phase-${phase}`).classList.remove('hidden');
+    }
+
+    function renderQuestion(index) {
+      const q = questions[index];
+      document.getElementById('q-current').textContent = index + 1;
+      document.getElementById('q-total').textContent = questions.length;
+      document.getElementById('q-concept').textContent = q.concept_tag.replace(/_/g, ' ');
+      document.getElementById('q-text').textContent = q.text;
+      document.getElementById('answer-input').value = answers[index] || '';
+      document.getElementById('progress-bar').style.width = `${(index / questions.length) * 100}%`;
+
+      const btn = document.getElementById('next-btn');
+      btn.textContent = index === questions.length - 1 ? 'Submit Assessment ✓' : 'Next Question →';
+    }
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      const answer = document.getElementById('answer-input').value.trim();
+      answers[currentIndex] = answer;
+
+      if (currentIndex < questions.length - 1) {
+        currentIndex++;
+        renderQuestion(currentIndex);
+      } else {
+        submitAssessment();
+      }
+    });
+
+    async function submitAssessment() {
+      show('submitting');
+      const payload = {
+        answers: questions.map((q, i) => ({
+          question_id: q.question_id,
+          answer: answers[i] || '',
+        })),
+      };
+      const res = await fetch(`/assessments/${assessmentId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      showResults(data.result);
+    }
+
+    function showResults(result) {
+      show('results');
+
+      if (IS_ADVANCEMENT) {
+        document.getElementById('results-subtitle').textContent =
+          'Your new learning channel has been assigned based on this test.';
+        document.getElementById('channel-label-sm').textContent = 'New channel';
+      } else {
+        document.getElementById('results-subtitle').textContent =
+          'Your personalised learning plan is ready.';
+        document.getElementById('channel-label-sm').textContent = 'Assigned channel';
+      }
+
+      const ch = CHANNEL_INFO[result.channel] || CHANNEL_INFO['foundation'];
+      const box = document.getElementById('channel-result-box');
+      box.className = `rounded-xl p-4 mb-4 ${ch.bg}`;
+      document.getElementById('channel-name').textContent = ch.label;
+      document.getElementById('channel-desc').textContent = ch.desc;
+
+      const scores = result.scores || {};
+      const grid = document.getElementById('scores-grid');
+      grid.innerHTML = '';
+      [['Accuracy', scores.accuracy], ['Depth', scores.depth], ['Fluency', scores.fluency]].forEach(([label, val]) => {
+        val = val ?? 0;
+        grid.innerHTML += `
+          <div class="bg-gray-50 rounded-xl p-3 text-center">
+            <p class="text-2xl font-bold text-gray-800">${val}</p>
+            <p class="text-xs text-gray-500">${label}</p>
+            <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+              <div class="bg-indigo-400 h-1.5 rounded-full" style="width:${val}%"></div>
+            </div>
+          </div>
+        `;
+      });
+
+      document.getElementById('feedback-text').textContent = result.feedback || '';
+
+      const gapsList = document.getElementById('gaps-list');
+      gapsList.innerHTML = '';
+      (result.gaps || []).forEach(g => {
+        gapsList.innerHTML += `<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">${g.replace(/_/g,' ')}</span>`;
+      });
+
+      const strengthsList = document.getElementById('strengths-list');
+      strengthsList.innerHTML = '';
+      (result.strengths || []).forEach(s => {
+        strengthsList.innerHTML += `<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">${s.replace(/_/g,' ')}</span>`;
+      });
+    }
+
+    async function init() {
+      // Set nav title based on test type
+      document.getElementById('nav-title').textContent = IS_ADVANCEMENT
+        ? 'Advancement Test'
+        : 'Preliminary Assessment';
+
+      if (IS_ADVANCEMENT && ASSESSMENT_ID_PARAM) {
+        // Load existing advancement assessment
+        const res = await fetch(`/assessments/${ASSESSMENT_ID_PARAM}`);
+        if (!res.ok) {
+          document.getElementById('phase-loading').innerHTML =
+            '<p class="text-red-500 text-center py-20">Could not load assessment. Please return home.</p>';
+          return;
+        }
+        const data = await res.json();
+        if (data.status !== 'pending') {
+          document.getElementById('phase-loading').innerHTML =
+            '<p class="text-gray-500 text-center py-20">This assessment has already been submitted. <a href="/static/index.html" class="text-indigo-500 underline">Return home</a>.</p>';
+          return;
+        }
+        assessmentId = data.assessment_id;
+        questions = data.questions;
+      } else {
+        // Create a new preliminary test
+        const res = await fetch('/assessments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate_id: CANDIDATE_ID, assessment_type: 'preliminary_test' }),
+        });
+        const data = await res.json();
+        assessmentId = data.assessment_id;
+        questions = data.questions;
+      }
+
+      answers = new Array(questions.length).fill('');
+      show('questions');
+      renderQuestion(0);
+    }
+
+    init();
+  </script>
+</body>
+</html>

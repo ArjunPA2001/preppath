@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrepPath — Progress</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
+    <a href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
+    <span class="text-lg font-bold text-indigo-600">Progress Overview</span>
+  </nav>
+
+  <div class="max-w-3xl mx-auto px-4 py-10 space-y-6">
+
+    <!-- Loading -->
+    <div id="loading" class="text-center py-20">
+      <div class="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p class="text-gray-400 text-sm">Loading progress…</p>
+    </div>
+
+    <!-- Content (hidden until loaded) -->
+    <div id="content" class="hidden space-y-6">
+
+      <!-- Interview ready banner -->
+      <div id="ready-banner" class="hidden bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-2xl p-6 flex items-center gap-4">
+        <span class="text-4xl">🏆</span>
+        <div>
+          <p class="text-lg font-bold">Interview Ready!</p>
+          <p class="text-sm opacity-90">You've reached the Interview Simulation channel. You're prepared for real interviews.</p>
+        </div>
+      </div>
+
+      <!-- Current channel -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Current Channel</p>
+        <div id="channel-card" class="rounded-xl p-4">
+          <p class="text-2xl font-bold" id="channel-name"></p>
+          <p class="text-sm mt-1" id="channel-desc"></p>
+        </div>
+        <div class="grid grid-cols-3 gap-3 mt-4" id="scores-display"></div>
+      </div>
+
+      <!-- Active session -->
+      <div id="active-session-card" class="hidden bg-white rounded-2xl shadow p-6">
+        <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-3">Active Session</p>
+        <div class="mb-3">
+          <p class="text-sm text-gray-500 mb-1">Concepts covered this session</p>
+          <div id="session-covered" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="mb-3">
+          <p class="text-sm text-gray-500 mb-1">Still to cover</p>
+          <div id="session-remaining" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 bg-gray-100 rounded-full h-2">
+            <div id="session-bar" class="bg-indigo-400 h-2 rounded-full transition-all"></div>
+          </div>
+          <span id="session-count" class="text-xs text-gray-400"></span>
+        </div>
+      </div>
+
+      <!-- Sections -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Sections</p>
+        <div id="sections-list" class="space-y-3"></div>
+      </div>
+
+      <!-- Gaps and strengths -->
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow p-5">
+          <p class="text-xs font-semibold text-red-500 uppercase tracking-wide mb-3">Areas to improve</p>
+          <div id="gaps-list" class="flex flex-wrap gap-2">
+            <span class="text-sm text-gray-400">None identified yet</span>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow p-5">
+          <p class="text-xs font-semibold text-green-600 uppercase tracking-wide mb-3">Strengths</p>
+          <div id="strengths-list" class="flex flex-wrap gap-2">
+            <span class="text-sm text-gray-400">None identified yet</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const CANDIDATE_ID = 1;
+
+    const CHANNEL_INFO = {
+      foundation: {
+        label: 'Foundation',
+        desc: 'Building core concepts from the ground up. No time pressure — focus on understanding.',
+        card: 'bg-blue-50 text-blue-900',
+      },
+      deepdive: {
+        label: 'Deep Dive',
+        desc: 'Going deeper — trade-offs, edge cases, and design decisions.',
+        card: 'bg-purple-50 text-purple-900',
+      },
+      simulation: {
+        label: 'Interview Simulation',
+        desc: 'Full mock interview mode. No hints, time pressure, debrief at the end.',
+        card: 'bg-green-50 text-green-900',
+      },
+      improvement: {
+        label: 'Improvement',
+        desc: 'Targeted practice on specific weak areas before returning to your main channel.',
+        card: 'bg-orange-50 text-orange-900',
+      },
+    };
+
+    async function load() {
+      const [candRes, progRes] = await Promise.all([
+        fetch(`/candidates/${CANDIDATE_ID}`),
+        fetch(`/candidates/${CANDIDATE_ID}/progress`),
+      ]);
+      const cand = await candRes.json();
+      const prog = await progRes.json();
+
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      // Interview ready
+      if (cand.interview_ready) {
+        document.getElementById('ready-banner').classList.remove('hidden');
+      }
+
+      // Channel
+      const ch = CHANNEL_INFO[cand.channel] || { label: cand.channel || '—', desc: 'Take the preliminary test to get started.', card: 'bg-gray-50 text-gray-700' };
+      const card = document.getElementById('channel-card');
+      card.className = `rounded-xl p-4 ${ch.card}`;
+      document.getElementById('channel-name').textContent = ch.label;
+      document.getElementById('channel-desc').textContent = ch.desc;
+
+      // Active session
+      if (prog.active_session) {
+        const as = prog.active_session;
+        document.getElementById('active-session-card').classList.remove('hidden');
+        const covered = as.covered_concepts || [];
+        const required = as.required_concepts || [];
+        const remaining = required.filter(c => !covered.includes(c));
+
+        const covEl = document.getElementById('session-covered');
+        covEl.innerHTML = covered.length
+          ? covered.map(c => `<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">${c.replace(/_/g,' ')}</span>`).join('')
+          : '<span class="text-xs text-gray-400">None yet</span>';
+
+        const remEl = document.getElementById('session-remaining');
+        remEl.innerHTML = remaining.length
+          ? remaining.map(c => `<span class="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">${c.replace(/_/g,' ')}</span>`).join('')
+          : '<span class="text-xs text-green-600 font-medium">All covered ✓</span>';
+
+        const pct = required.length ? (covered.length / required.length) * 100 : 0;
+        document.getElementById('session-bar').style.width = `${pct}%`;
+        document.getElementById('session-count').textContent = `${as.answer_count} answered`;
+      }
+
+      // Sections
+      const secList = document.getElementById('sections-list');
+      secList.innerHTML = '';
+      (prog.sections || []).forEach(sec => {
+        const done = (prog.completed_section_ids || []).includes(sec.id);
+        secList.innerHTML += `
+          <div class="flex items-center justify-between p-3 rounded-xl ${done ? 'bg-green-50' : 'bg-gray-50'}">
+            <div>
+              <p class="font-medium text-sm ${done ? 'text-green-800' : 'text-gray-700'}">${sec.name}</p>
+              <p class="text-xs text-gray-400 mt-0.5">${(sec.concepts || []).map(c=>c.replace(/_/g,' ')).join(' · ')}</p>
+            </div>
+            <span class="text-sm ${done ? 'text-green-600 font-semibold' : 'text-gray-300'}">${done ? '✓ Complete' : '○'}</span>
+          </div>
+        `;
+      });
+
+      // Gaps
+      const gaps = cand.gaps || [];
+      const gapEl = document.getElementById('gaps-list');
+      gapEl.innerHTML = gaps.length
+        ? gaps.map(g => `<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">${g.replace(/_/g,' ')}</span>`).join('')
+        : '<span class="text-sm text-gray-400">None identified yet</span>';
+
+      // Strengths
+      const strengths = cand.strengths || [];
+      const strEl = document.getElementById('strengths-list');
+      strEl.innerHTML = strengths.length
+        ? strengths.map(s => `<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">${s.replace(/_/g,' ')}</span>`).join('')
+        : '<span class="text-sm text-gray-400">None identified yet</span>';
+    }
+
+    load();
+  </script>
+</body>
+</html>
