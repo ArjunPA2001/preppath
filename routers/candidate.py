@@ -1,11 +1,37 @@
+"""
+Candidate router.
+
+Endpoints:
+  POST  /candidates                      — create a new candidate (no path yet)
+  GET   /candidates                      — list all candidates (executive / feeder view)
+  GET   /candidates/{id}                 — get one candidate
+  PUT   /candidates/{id}/pipeline        — assign a learning path
+                                           → auto-creates a pending preliminary assessment
+  GET   /candidates/{id}/progress        — channel, sections, covered concepts
+"""
 import json
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 import models
 from database import get_db
+from core.preliminary_test import build_preliminary_test
 
 router = APIRouter()
 
+
+# ── Request schemas ──────────────────────────────────────────────────────────
+
+class CreateCandidateRequest(BaseModel):
+    name: str
+    email: str = ""
+
+
+class AssignPipelineRequest(BaseModel):
+    learning_path_id: int
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _candidate_dict(c: models.Candidate) -> dict:
     return {
@@ -23,12 +49,143 @@ def _candidate_dict(c: models.Candidate) -> dict:
     }
 
 
+# ── Endpoints ────────────────────────────────────────────────────────────────
+
+@router.post("")
+def create_candidate(body: CreateCandidateRequest, db: DBSession = Depends(get_db)):
+    """Create a new candidate. Learning path is assigned separately via PUT /pipeline."""
+    candidate = models.Candidate(
+        name=body.name,
+        email=body.email,
+        channel="",
+        level="",
+        gaps=json.dumps([]),
+        strengths=json.dumps([]),
+    )
+    db.add(candidate)
+    db.commit()
+    db.refresh(candidate)
+    return _candidate_dict(candidate)
+
+
+@router.get("")
+def list_candidates(db: DBSession = Depends(get_db)):
+    """List all candidates with their current channel and readiness state."""
+    candidates = db.query(models.Candidate).order_by(models.Candidate.id).all()
+
+    # Build a name lookup for learning paths
+    path_ids = {c.learning_path_id for c in candidates if c.learning_path_id}
+    paths = {}
+    if path_ids:
+        for lp in db.query(models.LearningPath).filter(models.LearningPath.id.in_(path_ids)).all():
+            paths[lp.id] = lp.name
+
+    return {
+        "candidates": [
+            {
+                **_candidate_dict(c),
+                "learning_path_name": paths.get(c.learning_path_id, "") if c.learning_path_id else "",
+            }
+            for c in candidates
+        ]
+    }
+
+
 @router.get("/{candidate_id}")
 def get_candidate(candidate_id: int, db: DBSession = Depends(get_db)):
     candidate = db.query(models.Candidate).filter_by(id=candidate_id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return _candidate_dict(candidate)
+
+
+@router.put("/{candidate_id}/pipeline")
+def assign_pipeline(
+    candidate_id: int,
+    body: AssignPipelineRequest,
+    db: DBSession = Depends(get_db),
+):
+    """
+    Assign a (published) learning path to a candidate.
+
+    On assignment:
+      1. Sets candidate.learning_path_id
+      2. Resets channel / level / gaps / strengths (fresh start on new path)
+      3. Auto-creates a pending preliminary assessment so the candidate can
+         immediately go to /test and take it — no separate create step needed.
+
+    Architecture note (SDD §candidate router):
+      PUT /candidates/{id}/pipeline → auto-build preliminary test → trigger Plan Gen
+      Plan Gen runs AFTER the preliminary test is submitted (in assessment router).
+    """
+    candidate = db.query(models.Candidate).filter_by(id=candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    lp = db.query(models.LearningPath).filter_by(id=body.learning_path_id).first()
+    if not lp:
+        raise HTTPException(status_code=404, detail="Learning path not found")
+    if lp.status != "published":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Learning path '{lp.name}' is not published yet. Publish it first.",
+        )
+
+    # Assign path and reset candidate state for a fresh start
+    candidate.learning_path_id = body.learning_path_id
+    candidate.channel = ""
+    candidate.level = ""
+    candidate.gaps = json.dumps([])
+    candidate.strengths = json.dumps([])
+    candidate.pre_improvement_channel = None
+    candidate.interview_ready = False
+    candidate.plan_id = None
+    db.commit()
+
+    # Auto-build the preliminary test question list scoped to this path's sections
+    path_section_ids = [
+        s.id for s in db.query(models.Section).filter_by(learning_path_id=body.learning_path_id).all()
+    ]
+    questions = build_preliminary_test(db, section_ids=path_section_ids)
+
+    if not questions:
+        # Path has no preliminary questions yet — still assign but warn
+        return {
+            "candidate": _candidate_dict(candidate),
+            "preliminary_assessment_id": None,
+            "warning": "No preliminary questions found for this path. Publish the path to generate questions.",
+        }
+
+    question_ids = [q["question_id"] for q in questions]
+
+    # Cancel any existing pending preliminary assessment for this candidate
+    existing = (
+        db.query(models.Assessment)
+        .filter_by(candidate_id=candidate_id, assessment_type="preliminary_test", status="pending")
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    # Create the new preliminary assessment
+    assessment = models.Assessment(
+        candidate_id=candidate_id,
+        assessment_type="preliminary_test",
+        session_id=None,
+        status="pending",
+        question_ids=json.dumps(question_ids),
+    )
+    db.add(assessment)
+    db.commit()
+    db.refresh(assessment)
+
+    return {
+        "candidate": _candidate_dict(candidate),
+        "preliminary_assessment_id": assessment.id,
+        "preliminary_questions": questions,
+        "message": f"Learning path '{lp.name}' assigned. Preliminary test is ready.",
+    }
 
 
 @router.get("/{candidate_id}/progress")
@@ -45,7 +202,7 @@ def get_progress(candidate_id: int, db: DBSession = Depends(get_db)):
         .first()
     )
 
-    # All sections for the candidate's learning path (in plan order if plan exists)
+    # All sections for the candidate's learning path (in order)
     sections_raw = (
         db.query(models.Section)
         .filter_by(learning_path_id=candidate.learning_path_id)

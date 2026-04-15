@@ -2,25 +2,28 @@
 Builds a deterministic preliminary test from the question bank.
 No LLM involved — picks one is_preliminary=True question per concept.
 """
-import json
 from sqlalchemy.orm import Session
 import models
 
 
-def build_preliminary_test(db: Session, seniority: str = "mid") -> list[dict]:
+def build_preliminary_test(db: Session, section_ids: list[int] | None = None) -> list[dict]:
     """
-    Return one preliminary question per concept across ALL sections,
-    ordered by section then concept for reproducibility.
+    Return one preliminary question per concept for the given sections.
+
+    Args:
+        section_ids: restrict to these section IDs. If None, returns across all sections.
+                     Callers should always pass section_ids scoped to the candidate's
+                     learning path so candidates don't receive questions from other paths.
     """
-    questions = (
-        db.query(models.Question)
-        .filter(
-            models.Question.is_preliminary == True,
-            models.Question.seniority == seniority,
-        )
-        .order_by(models.Question.section_id.asc(), models.Question.concept_tag.asc())
-        .all()
-    )
+    query = db.query(models.Question).filter(models.Question.is_preliminary == True)
+
+    if section_ids is not None:
+        query = query.filter(models.Question.section_id.in_(section_ids))
+
+    questions = query.order_by(
+        models.Question.section_id.asc(),
+        models.Question.concept_tag.asc(),
+    ).all()
 
     return [
         {

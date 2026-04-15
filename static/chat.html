@@ -20,7 +20,7 @@
   <!-- Nav -->
   <nav class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
     <div class="flex items-center gap-3">
-      <a href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
+      <a id="nav-home" href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
       <div>
         <span class="font-semibold text-gray-800" id="section-title">Loading…</span>
         <span id="channel-badge" class="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500"></span>
@@ -81,6 +81,8 @@
     const params = new URLSearchParams(location.search);
     const SECTION_ID = parseInt(params.get('section_id')) || 1;
     const CANDIDATE_ID = parseInt(params.get('candidate_id')) || 1;
+
+    document.getElementById('nav-home').href = `/static/index.html?candidate_id=${CANDIDATE_ID}`;
 
     const CHANNEL_STYLES = {
       foundation:  'bg-blue-100 text-blue-700',
@@ -317,7 +319,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ candidate_id: CANDIDATE_ID }),
       });
-      window.location.href = '/static/progress.html';
+      window.location.href = `/static/progress.html?candidate_id=${CANDIDATE_ID}`;
     });
 
     // ── Init ────────────────────────────────────────────────────────────────

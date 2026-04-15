@@ -10,7 +10,7 @@ load_dotenv()
 import models
 from database import engine, SessionLocal
 import seed
-from routers import candidate, session, assessment, questions
+from routers import candidate, session, assessment, questions, pipeline
 
 
 @asynccontextmanager
@@ -36,6 +36,7 @@ app.include_router(candidate.router, prefix="/candidates", tags=["candidates"])
 app.include_router(session.router, prefix="/sessions", tags=["sessions"])
 app.include_router(assessment.router, prefix="/assessments", tags=["assessments"])
 app.include_router(questions.router, prefix="/questions", tags=["questions"])
+app.include_router(pipeline.router, prefix="/pipelines", tags=["pipelines"])
 
 
 @app.get("/")

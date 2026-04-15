@@ -11,7 +11,10 @@
   <!-- Nav -->
   <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
     <span class="text-xl font-bold text-indigo-600">PrepPath</span>
-    <span class="text-sm text-gray-400">Candidate Portal</span>
+    <div class="flex items-center gap-4">
+      <a href="/static/pipeline.html" class="text-sm text-indigo-500 hover:underline">Feeder</a>
+      <span class="text-sm text-gray-400">Candidate Portal</span>
+    </div>
   </nav>
 
   <div class="max-w-3xl mx-auto px-4 py-10">
@@ -50,7 +53,7 @@
       <div id="prelim-card" class="hidden bg-white rounded-2xl shadow p-6 border-l-4 border-yellow-400">
         <h2 class="font-semibold text-gray-800 mb-1">Step 1: Preliminary Assessment</h2>
         <p class="text-sm text-gray-500 mb-4">A short test to calibrate your starting level and learning plan.</p>
-        <a href="/static/test.html" class="inline-block bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold px-5 py-2 rounded-lg transition">Take Assessment →</a>
+        <a id="prelim-link" href="/static/test.html" class="inline-block bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold px-5 py-2 rounded-lg transition">Take Assessment →</a>
       </div>
 
       <!-- Mentor sessions card -->
@@ -64,14 +67,15 @@
       <div id="progress-card" class="hidden bg-white rounded-2xl shadow p-6 border-l-4 border-green-400">
         <h2 class="font-semibold text-gray-800 mb-1">View Progress</h2>
         <p class="text-sm text-gray-500 mb-4">See covered concepts, gaps, strengths, and your current standing.</p>
-        <a href="/static/progress.html" class="inline-block bg-green-500 hover:bg-green-600 text-white font-semibold px-5 py-2 rounded-lg transition">View Progress →</a>
+        <a id="progress-link" href="/static/progress.html" class="inline-block bg-green-500 hover:bg-green-600 text-white font-semibold px-5 py-2 rounded-lg transition">View Progress →</a>
       </div>
 
     </div>
   </div>
 
   <script>
-    const CANDIDATE_ID = 1;
+    const params = new URLSearchParams(window.location.search);
+    const CANDIDATE_ID = parseInt(params.get('candidate_id') || '1');
 
     const CHANNEL_STYLES = {
       foundation:  { label: 'Foundation',        bg: 'bg-blue-100 text-blue-700' },
@@ -80,6 +84,10 @@
       improvement: { label: 'Improvement',        bg: 'bg-orange-100 text-orange-700' },
       '':          { label: 'Not started',        bg: 'bg-gray-100 text-gray-500' },
     };
+
+    // Wire candidate_id into all static links
+    document.getElementById('prelim-link').href = `/static/test.html?candidate_id=${CANDIDATE_ID}`;
+    document.getElementById('progress-link').href = `/static/progress.html?candidate_id=${CANDIDATE_ID}`;
 
     async function load() {
       const [candRes, progRes] = await Promise.all([

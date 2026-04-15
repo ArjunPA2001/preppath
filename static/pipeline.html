@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrepPath — Feeder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <a href="/static/index.html" class="text-xl font-bold text-indigo-600">PrepPath</a>
+    <span class="text-sm text-gray-400">Feeder — Author Learning Paths &amp; Manage Candidates</span>
+  </nav>
+
+  <!-- Tab bar -->
+  <div class="max-w-4xl mx-auto px-4 pt-6 flex gap-2">
+    <button onclick="showTab('paths')" id="tab-paths"
+      class="px-4 py-2 rounded-t-lg font-semibold text-sm border-b-2 border-indigo-500 text-indigo-700 bg-white">
+      Learning Paths
+    </button>
+    <button onclick="showTab('candidates')" id="tab-candidates"
+      class="px-4 py-2 rounded-t-lg font-semibold text-sm border-b-2 border-transparent text-gray-500 bg-white hover:text-indigo-600">
+      Candidates
+    </button>
+  </div>
+
+  <div class="max-w-4xl mx-auto px-4 pb-8 space-y-6">
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- TAB: LEARNING PATHS                           -->
+    <!-- ══════════════════════════════════════════════ -->
+    <div id="tab-content-paths" class="space-y-6">
+
+      <!-- Existing pipelines -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-gray-800">Existing Learning Paths</h2>
+          <button onclick="loadList()" class="text-xs text-indigo-500 hover:underline">Refresh</button>
+        </div>
+        <div id="pipeline-list" class="space-y-2 text-sm text-gray-600">Loading…</div>
+      </div>
+
+      <!-- Step 1: Create a learning path -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h2 class="font-semibold text-gray-800 mb-1">Step 1 — Create Learning Path</h2>
+        <p class="text-xs text-gray-500 mb-4">The top-level container, e.g. "python-dev-junior".</p>
+        <div class="grid grid-cols-2 gap-3">
+          <input id="lp-name" placeholder="Name (e.g. python-dev-junior)" class="border rounded px-3 py-2 col-span-2" />
+          <input id="lp-language" placeholder="Language (e.g. python)" class="border rounded px-3 py-2" />
+          <select id="lp-seniority" class="border rounded px-3 py-2">
+            <option value="junior">junior</option>
+            <option value="mid" selected>mid</option>
+            <option value="senior">senior</option>
+          </select>
+          <textarea id="lp-description" placeholder="Description" class="border rounded px-3 py-2 col-span-2" rows="2"></textarea>
+          <textarea id="lp-samples" placeholder="Sample questions (one per line)" class="border rounded px-3 py-2 col-span-2" rows="3"></textarea>
+        </div>
+        <button onclick="createPath()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg">Create Learning Path</button>
+      </div>
+
+      <!-- Working area (visible once a path is selected) -->
+      <div id="working-area" class="hidden space-y-6">
+
+        <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-sm">
+          <p class="text-gray-600">Working on:
+            <span id="current-path-label" class="font-semibold text-indigo-700"></span>
+          </p>
+        </div>
+
+        <!-- Step 2: Add section -->
+        <div class="bg-white rounded-2xl shadow p-6">
+          <h2 class="font-semibold text-gray-800 mb-1">Step 2 — Add Section</h2>
+          <p class="text-xs text-gray-500 mb-4">e.g. "pre-assessment", "Client Interview".</p>
+          <div class="grid grid-cols-2 gap-3">
+            <input id="sec-name" placeholder="Section name" class="border rounded px-3 py-2 col-span-2" />
+            <textarea id="sec-description" placeholder="Description — what is this section used for?" class="border rounded px-3 py-2 col-span-2" rows="2"></textarea>
+            <textarea id="sec-concepts" placeholder="Concepts (comma or newline separated, e.g. python_types, loops, functions)" class="border rounded px-3 py-2 col-span-2" rows="2"></textarea>
+          </div>
+          <button onclick="addSection()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg">Add Section</button>
+        </div>
+
+        <!-- Step 3: Add eval pattern -->
+        <div class="bg-white rounded-2xl shadow p-6">
+          <h2 class="font-semibold text-gray-800 mb-1">Step 3 — Add Evaluation Pattern</h2>
+          <p class="text-xs text-gray-500 mb-4">A round type inside a section, e.g. "coding snippet — predict output".</p>
+          <div class="grid grid-cols-2 gap-3">
+            <select id="pat-section" class="border rounded px-3 py-2 col-span-2">
+              <option value="">-- Pick a section --</option>
+            </select>
+            <input id="pat-name" placeholder="Pattern name (e.g. Coding Snippet Round)" class="border rounded px-3 py-2 col-span-2" />
+            <textarea id="pat-description" placeholder="Description of this round" class="border rounded px-3 py-2 col-span-2" rows="2"></textarea>
+            <textarea id="pat-samples" placeholder="Sample questions (one per line)" class="border rounded px-3 py-2 col-span-2" rows="3"></textarea>
+          </div>
+          <button onclick="addPattern()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg">Add Pattern</button>
+        </div>
+
+        <!-- Structure preview -->
+        <div class="bg-white rounded-2xl shadow p-6">
+          <h2 class="font-semibold text-gray-800 mb-3">Current Structure</h2>
+          <div id="structure-view" class="text-sm text-gray-700 space-y-3"></div>
+        </div>
+
+        <!-- Step 4: Publish -->
+        <div class="bg-white rounded-2xl shadow p-6 border-l-4 border-green-400">
+          <h2 class="font-semibold text-gray-800 mb-1">Step 4 — Publish</h2>
+          <p class="text-xs text-gray-500 mb-4">Runs the Question Gen Agent — generates 9 questions per concept and a rubric per section.</p>
+          <button onclick="publish()" class="bg-green-500 hover:bg-green-600 text-white font-semibold px-5 py-2 rounded-lg">Publish Pipeline</button>
+          <p id="publish-status" class="text-sm text-gray-600 mt-3"></p>
+        </div>
+
+      </div>
+    </div><!-- /tab-content-paths -->
+
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- TAB: CANDIDATES                               -->
+    <!-- ══════════════════════════════════════════════ -->
+    <div id="tab-content-candidates" class="hidden space-y-6">
+
+      <!-- Candidate list -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-gray-800">All Candidates</h2>
+          <button onclick="loadCandidates()" class="text-xs text-indigo-500 hover:underline">Refresh</button>
+        </div>
+        <div id="candidate-list" class="space-y-2 text-sm text-gray-600">Loading…</div>
+      </div>
+
+      <!-- Create candidate -->
+      <div class="bg-white rounded-2xl shadow p-6">
+        <h2 class="font-semibold text-gray-800 mb-1">Create Candidate</h2>
+        <p class="text-xs text-gray-500 mb-4">Add a new candidate. Assign a learning path below after creating.</p>
+        <div class="grid grid-cols-2 gap-3">
+          <input id="cand-name" placeholder="Full name" class="border rounded px-3 py-2" />
+          <input id="cand-email" placeholder="Email (optional)" class="border rounded px-3 py-2" />
+        </div>
+        <button onclick="createCandidate()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg">Create Candidate</button>
+        <p id="create-cand-status" class="text-sm text-gray-600 mt-2"></p>
+      </div>
+
+      <!-- Assign learning path -->
+      <div class="bg-white rounded-2xl shadow p-6 border-l-4 border-indigo-400">
+        <h2 class="font-semibold text-gray-800 mb-1">Assign Learning Path to Candidate</h2>
+        <p class="text-xs text-gray-500 mb-4">Only <b>published</b> paths can be assigned. Assignment auto-creates the preliminary test.</p>
+        <div class="grid grid-cols-2 gap-3">
+          <select id="assign-candidate" class="border rounded px-3 py-2">
+            <option value="">-- Select Candidate --</option>
+          </select>
+          <select id="assign-path" class="border rounded px-3 py-2">
+            <option value="">-- Select Learning Path --</option>
+          </select>
+        </div>
+        <button onclick="assignPipeline()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg">Assign Path</button>
+        <p id="assign-status" class="text-sm text-gray-600 mt-3"></p>
+      </div>
+
+    </div><!-- /tab-content-candidates -->
+
+  </div><!-- /container -->
+
+<script>
+  let currentPathId = null;
+  let allCandidates = [];
+  let allPaths = [];
+
+  // ── Tab switching ──────────────────────────────────
+
+  function showTab(tab) {
+    ['paths', 'candidates'].forEach(t => {
+      document.getElementById(`tab-content-${t}`).classList.toggle('hidden', t !== tab);
+      const btn = document.getElementById(`tab-${t}`);
+      btn.classList.toggle('border-indigo-500', t === tab);
+      btn.classList.toggle('text-indigo-700', t === tab);
+      btn.classList.toggle('border-transparent', t !== tab);
+      btn.classList.toggle('text-gray-500', t !== tab);
+    });
+    if (tab === 'candidates') loadCandidates();
+  }
+
+  // ── Helpers ────────────────────────────────────────
+
+  function splitLines(text) {
+    return text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  }
+  function splitConcepts(text) {
+    return text.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+  }
+
+  // ── Learning path tab ──────────────────────────────
+
+  async function loadList() {
+    const res = await fetch('/pipelines');
+    const data = await res.json();
+    allPaths = data.pipelines;
+    const el = document.getElementById('pipeline-list');
+    if (!allPaths.length) { el.textContent = 'No learning paths yet.'; return; }
+    el.innerHTML = '';
+    allPaths.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between bg-gray-50 rounded-lg p-2';
+      row.innerHTML = `
+        <span><b>${p.name}</b> <span class="text-xs text-gray-400">· ${p.language || '—'} · ${p.seniority}</span>
+          <span class="ml-2 px-2 py-0.5 rounded text-xs ${p.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${p.status}</span>
+        </span>
+        <button class="text-xs text-indigo-500 hover:underline" onclick="openPath(${p.id})">Edit →</button>`;
+      el.appendChild(row);
+    });
+    // Also refresh path dropdown in assign section
+    refreshAssignDropdowns();
+  }
+
+  async function createPath() {
+    const body = {
+      name: document.getElementById('lp-name').value.trim(),
+      language: document.getElementById('lp-language').value.trim(),
+      seniority: document.getElementById('lp-seniority').value,
+      description: document.getElementById('lp-description').value.trim(),
+      sample_questions: splitLines(document.getElementById('lp-samples').value),
+    };
+    if (!body.name) { alert('Name is required'); return; }
+    const res = await fetch('/pipelines', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    await openPath(data.id);
+    loadList();
+  }
+
+  async function openPath(id) {
+    currentPathId = id;
+    await refreshPath();
+    document.getElementById('working-area').classList.remove('hidden');
+    window.scrollTo({top: document.getElementById('working-area').offsetTop, behavior: 'smooth'});
+  }
+
+  async function refreshPath() {
+    const res = await fetch(`/pipelines/${currentPathId}`);
+    const data = await res.json();
+    document.getElementById('current-path-label').textContent =
+      `${data.name} (${data.language || '—'} · ${data.seniority}) — ${data.status}`;
+
+    const sel = document.getElementById('pat-section');
+    sel.innerHTML = '<option value="">-- Pick a section --</option>';
+    data.sections.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name;
+      sel.appendChild(opt);
+    });
+
+    const view = document.getElementById('structure-view');
+    if (!data.sections.length) {
+      view.innerHTML = '<p class="text-gray-400 italic">No sections yet.</p>';
+    } else {
+      view.innerHTML = '';
+      data.sections.forEach(s => {
+        const box = document.createElement('div');
+        box.className = 'border rounded-lg p-3 bg-gray-50';
+        const patterns = s.patterns.map(p =>
+          `<li><b>${p.name}</b> — ${p.description || ''}${p.sample_patterns.length ? ` <span class="text-xs text-gray-400">(${p.sample_patterns.length} samples)</span>` : ''}</li>`
+        ).join('');
+        box.innerHTML = `
+          <p class="font-semibold">${s.name}</p>
+          <p class="text-xs text-gray-500 mb-1">${s.description || ''}</p>
+          <p class="text-xs text-gray-400 mb-2">Concepts: ${s.concepts.join(', ') || '—'}</p>
+          ${patterns ? `<ul class="list-disc pl-5 text-xs text-gray-600">${patterns}</ul>` : '<p class="text-xs text-gray-400 italic">No patterns yet.</p>'}
+        `;
+        view.appendChild(box);
+      });
+    }
+  }
+
+  async function addSection() {
+    if (!currentPathId) return;
+    const body = {
+      name: document.getElementById('sec-name').value.trim(),
+      description: document.getElementById('sec-description').value.trim(),
+      concepts: splitConcepts(document.getElementById('sec-concepts').value),
+    };
+    if (!body.name) { alert('Section name required'); return; }
+    await fetch(`/pipelines/${currentPathId}/sections`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    document.getElementById('sec-name').value = '';
+    document.getElementById('sec-description').value = '';
+    document.getElementById('sec-concepts').value = '';
+    await refreshPath();
+  }
+
+  async function addPattern() {
+    const sectionId = document.getElementById('pat-section').value;
+    if (!sectionId) { alert('Pick a section'); return; }
+    const body = {
+      name: document.getElementById('pat-name').value.trim(),
+      description: document.getElementById('pat-description').value.trim(),
+      sample_patterns: splitLines(document.getElementById('pat-samples').value),
+    };
+    if (!body.name) { alert('Pattern name required'); return; }
+    await fetch(`/pipelines/sections/${sectionId}/patterns`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    document.getElementById('pat-name').value = '';
+    document.getElementById('pat-description').value = '';
+    document.getElementById('pat-samples').value = '';
+    await refreshPath();
+  }
+
+  async function publish() {
+    if (!currentPathId) return;
+    const status = document.getElementById('publish-status');
+    status.textContent = 'Publishing — running Question Gen Agent, this may take a minute…';
+    try {
+      const res = await fetch(`/pipelines/${currentPathId}/publish`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Publish failed');
+      const total = data.sections.reduce((a, s) => a + (s.questions_added || 0), 0);
+      status.innerHTML = `<span class="text-green-600">✓ Published. ${total} questions generated across ${data.sections.length} sections.</span>`;
+      await refreshPath();
+      loadList();
+    } catch (e) {
+      status.innerHTML = `<span class="text-red-600">Error: ${e.message}</span>`;
+    }
+  }
+
+  // ── Candidates tab ─────────────────────────────────
+
+  async function loadCandidates() {
+    const [candRes, pathRes] = await Promise.all([
+      fetch('/candidates'),
+      fetch('/pipelines'),
+    ]);
+    const candData = await candRes.json();
+    const pathData = await pathRes.json();
+    allCandidates = candData.candidates;
+    allPaths = pathData.pipelines;
+
+    const CHANNEL_LABEL = {
+      foundation: 'Foundation', deepdive: 'Deep Dive',
+      simulation: 'Interview Sim', improvement: 'Improvement', '': 'Not started',
+    };
+    const CHANNEL_COLOR = {
+      foundation: 'bg-blue-100 text-blue-700', deepdive: 'bg-purple-100 text-purple-700',
+      simulation: 'bg-green-100 text-green-700', improvement: 'bg-orange-100 text-orange-700',
+      '': 'bg-gray-100 text-gray-500',
+    };
+
+    const el = document.getElementById('candidate-list');
+    if (!allCandidates.length) { el.textContent = 'No candidates yet.'; }
+    else {
+      el.innerHTML = '';
+      allCandidates.forEach(c => {
+        const ch = c.channel || '';
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between bg-gray-50 rounded-lg p-2';
+        row.innerHTML = `
+          <div>
+            <span class="font-medium">${c.name}</span>
+            <span class="text-xs text-gray-400 ml-2">${c.email || ''}</span>
+            ${c.learning_path_name ? `<span class="text-xs text-gray-500 ml-2">· ${c.learning_path_name}</span>` : ''}
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-xs font-semibold ${CHANNEL_COLOR[ch]}">${CHANNEL_LABEL[ch]}</span>
+            ${c.interview_ready ? '<span class="text-xs text-green-600 font-semibold">✓ Ready</span>' : ''}
+            <a href="/static/index.html?candidate_id=${c.id}" class="text-xs text-indigo-500 hover:underline">View →</a>
+          </div>`;
+        el.appendChild(row);
+      });
+    }
+
+    refreshAssignDropdowns();
+  }
+
+  function refreshAssignDropdowns() {
+    const candSel = document.getElementById('assign-candidate');
+    const pathSel = document.getElementById('assign-path');
+    if (!candSel || !pathSel) return;
+
+    const prevCand = candSel.value;
+    const prevPath = pathSel.value;
+
+    candSel.innerHTML = '<option value="">-- Select Candidate --</option>';
+    allCandidates.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `${c.name}${c.email ? ` (${c.email})` : ''}`;
+      if (String(c.id) === prevCand) opt.selected = true;
+      candSel.appendChild(opt);
+    });
+
+    pathSel.innerHTML = '<option value="">-- Select Learning Path --</option>';
+    allPaths.filter(p => p.status === 'published').forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = `${p.name} (${p.seniority})`;
+      if (String(p.id) === prevPath) opt.selected = true;
+      pathSel.appendChild(opt);
+    });
+  }
+
+  async function createCandidate() {
+    const name = document.getElementById('cand-name').value.trim();
+    const email = document.getElementById('cand-email').value.trim();
+    const status = document.getElementById('create-cand-status');
+    if (!name) { alert('Name is required'); return; }
+    const res = await fetch('/candidates', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, email }),
+    });
+    const data = await res.json();
+    if (!res.ok) { status.innerHTML = `<span class="text-red-600">Error: ${data.detail}</span>`; return; }
+    status.innerHTML = `<span class="text-green-600">✓ Candidate "${data.name}" created (id=${data.id}). Now assign a learning path below.</span>`;
+    document.getElementById('cand-name').value = '';
+    document.getElementById('cand-email').value = '';
+    await loadCandidates();
+  }
+
+  async function assignPipeline() {
+    const candidateId = document.getElementById('assign-candidate').value;
+    const pathId = document.getElementById('assign-path').value;
+    const status = document.getElementById('assign-status');
+    if (!candidateId || !pathId) { alert('Select both a candidate and a learning path'); return; }
+    status.textContent = 'Assigning…';
+    try {
+      const res = await fetch(`/candidates/${candidateId}/pipeline`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ learning_path_id: parseInt(pathId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed');
+      const msg = data.warning
+        ? `⚠ ${data.warning}`
+        : `✓ ${data.message} Preliminary assessment id=${data.preliminary_assessment_id} is ready.`;
+      status.innerHTML = `<span class="${data.warning ? 'text-yellow-600' : 'text-green-600'}">${msg}</span>`;
+      await loadCandidates();
+    } catch (e) {
+      status.innerHTML = `<span class="text-red-600">Error: ${e.message}</span>`;
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────
+
+  loadList();
+</script>
+</body>
+</html>

@@ -112,6 +112,7 @@ def _build_system_prompt(
     current_question_text: str | None,
     technique_name: str,
     technique_instruction: str,
+    transitioned_from: str | None = None,
 ) -> str:
     persona = _PERSONAS.get(channel, _PERSONAS["foundation"])
     uncovered = [c for c in required_concepts if c not in covered_concepts]
@@ -122,7 +123,28 @@ def _build_system_prompt(
         else f"Explore the concept {current_concept_tag} conversationally — no set question."
     )
 
-    return f"""You are {persona}
+    valid_concepts = ", ".join(required_concepts) if required_concepts else current_concept_tag
+
+    transition_block = ""
+    if transitioned_from and transitioned_from != current_concept_tag:
+        new_q_line = (
+            f'Introduce the new question naturally (do not quote verbatim):\n  "{current_question_text}"'
+            if current_question_text
+            else f"Open the new concept with a probing question."
+        )
+        transition_block = f"""
+
+TOPIC TRANSITION (overrides rules 1 and 3 for this turn ONLY):
+The candidate just finished **{transitioned_from}** successfully. Your previous message ended with a follow-up question on {transitioned_from}, and the candidate's latest message is their reply to THAT question.
+This turn you MUST pivot:
+  1. Acknowledge their reply on {transitioned_from} in ONE short sentence (e.g. "Good — that's right.").
+  2. Announce you're moving on to **{current_concept_tag}**.
+  3. {new_q_line}
+  4. Your ending question MUST be about {current_concept_tag}, NOT {transitioned_from}. Do not probe {transitioned_from} any further.
+For the signal tag on this turn, concept_tag should be {transitioned_from} (that's what the candidate's message was about).
+"""
+
+    return f"""You are {persona}{transition_block}
 
 Context:
   Candidate level: {candidate_level} | Channel: {channel}
@@ -152,8 +174,10 @@ CONVERSATION RULES (follow these strictly):
 4. Do NOT write bullet-point notes or lecture-style paragraphs. This is a conversation, not a lesson.
 
 5. After your response, append this hidden signal on its own line (never mention it to the candidate):
-<signal>{{"concept_tag":"{current_concept_tag}","quality":"QUALITY"}}</signal>
-Replace QUALITY with: wrong (misunderstood or no attempt), partial (on the right track but incomplete), correct (clear understanding shown)."""
+<signal>{{"concept_tag":"CONCEPT","quality":"QUALITY"}}</signal>
+Replace CONCEPT with the concept this answer was actually about — must be one of: {valid_concepts}.
+Replace QUALITY with: wrong (misunderstood or no attempt), partial (on the right track but incomplete), correct (clear understanding shown).
+If the candidate's answer touched multiple concepts, pick the one most central to their response."""
 
 
 def extract_signal(text: str) -> dict | None:
@@ -235,6 +259,7 @@ def stream_mentor_response(
     last_quality: str | None,
     chat_history: list[dict],
     user_message: str,
+    transitioned_from: str | None = None,
 ) -> tuple[str, dict | None]:
     """
     Call the Mentor Agent and return (clean_response, signal_dict).
@@ -257,6 +282,7 @@ def stream_mentor_response(
         current_question_text=current_question_text,
         technique_name=technique_name,
         technique_instruction=technique_instruction,
+        transitioned_from=transitioned_from,
     )
 
     messages = [{"role": "system", "content": system_prompt}]

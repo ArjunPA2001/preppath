@@ -207,17 +207,27 @@ def chat(session_id: int, body: ChatRequest):
             )
             last_quality = last_answer.quality if last_answer else None
 
-            # Reuse the in-memory current question so it doesn't jump around mid-concept.
-            # Only fetch a fresh question when the concept has changed (covered → next concept).
-            concept_tag = _pick_next_concept(session)
+            # The current question is whatever is cached from the previous turn.
+            # This is what the candidate is actually responding to right now.
+            # We must NOT advance to the next concept before calling the mentor —
+            # doing so would make the signal attribute the candidate's answer to the
+            # wrong concept (the one they haven't been asked yet).
             cached_q = memory.get_current_question(session_id)
+            transitioned_from = None
 
-            if cached_q and cached_q.get("concept_tag") == concept_tag:
-                # Same concept — keep asking about the same question
+            if cached_q:
+                # Candidate is responding to the question they were shown last turn.
+                concept_tag = cached_q["concept_tag"]
                 question_text = cached_q["text"]
                 question_id = cached_q["id"]
+                transitioned_from = cached_q.get("transitioned_from")
+                if transitioned_from:
+                    # Clear the flag so it only fires on this one turn.
+                    cached_q = {k: v for k, v in cached_q.items() if k != "transitioned_from"}
+                    memory.set_current_question(session_id, cached_q)
             else:
-                # Concept changed — fetch a new question for the new concept
+                # No cached question (e.g. memory was cleared). Recover gracefully.
+                concept_tag = _pick_next_concept(session)
                 band = question_selector.select_band(candidate.channel, last_quality)
                 fetched = question_selector.fetch_question(
                     db=db,
@@ -229,6 +239,7 @@ def chat(session_id: int, body: ChatRequest):
                 if fetched:
                     cached_q = {"id": fetched.id, "text": fetched.text, "concept_tag": fetched.concept_tag}
                     memory.set_current_question(session_id, cached_q)
+                    concept_tag = cached_q["concept_tag"]
                     question_text = fetched.text
                     question_id = fetched.id
                 else:
@@ -255,6 +266,7 @@ def chat(session_id: int, body: ChatRequest):
                 last_quality=last_quality,
                 chat_history=memory.get_history(session_id),
                 user_message=body.message,
+                transitioned_from=transitioned_from,
             )
 
             # Extract concept_tag and quality from signal (fall back gracefully)
@@ -361,7 +373,12 @@ def chat(session_id: int, body: ChatRequest):
                     )
                     if nq:
                         next_question = {"id": nq.id, "text": nq.text, "concept_tag": nq.concept_tag}
-                        memory.set_current_question(session_id, next_question)
+                        # Mark the transition so the next turn's mentor prompt pivots
+                        # away from the just-finished concept instead of continuing it.
+                        cache_entry = dict(next_question)
+                        if sig_concept and sig_concept != nq.concept_tag:
+                            cache_entry["transitioned_from"] = sig_concept
+                        memory.set_current_question(session_id, cache_entry)
                         session.current_concept_tag = nq.concept_tag
                         db.commit()
 

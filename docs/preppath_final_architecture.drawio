@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TITLE BLOCK -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="main_title" value="PrepPath — System Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=22;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+      <mxGeometry x="400" y="14" width="860" height="30" as="geometry" />
+    </mxCell>
+    <mxCell id="main_sub" value="Hackathon MVP  ·  Next.js frontend  ·  FastAPI backend  ·  4 AI agents  ·  PostgreSQL" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=11;fontColor=#6B7280;" vertex="1" parent="1">
+      <mxGeometry x="400" y="44" width="860" height="18" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SECTION LABEL STYLE NOTES:
+         Purple  #7C3AED = Frontend
+         Green   #16A34A = Backend / Routers
+         Orange  #EA580C = AI Agents
+         Blue    #2563EB = Data
+         Amber   #D97706 = Channel state
+         Gray    #6B7280 = Utilities / logic
+    -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 1 — USERS (3 roles) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="users_label" value="Users" style="text;html=1;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;fontColor=#6B7280;" vertex="1" parent="1">
+      <mxGeometry x="60" y="78" width="60" height="20" as="geometry" />
+    </mxCell>
+
+    <mxCell id="u_exec" value="Executive" style="ellipse;fillColor=#EEF2FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="120" y="72" width="120" height="44" as="geometry" />
+    </mxCell>
+    <mxCell id="u_exec_d" value="Views reports" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#6B7280;align=center;" vertex="1" parent="1">
+      <mxGeometry x="120" y="117" width="120" height="14" as="geometry" />
+    </mxCell>
+
+    <mxCell id="u_feeder" value="Feeder" style="ellipse;fillColor=#EEF2FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="280" y="72" width="120" height="44" as="geometry" />
+    </mxCell>
+    <mxCell id="u_feeder_d" value="Builds learning paths" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#6B7280;align=center;" vertex="1" parent="1">
+      <mxGeometry x="280" y="117" width="120" height="14" as="geometry" />
+    </mxCell>
+
+    <mxCell id="u_cand" value="Candidate" style="ellipse;fillColor=#EEF2FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="440" y="72" width="120" height="44" as="geometry" />
+    </mxCell>
+    <mxCell id="u_cand_d" value="Learns and gets assessed" style="text;html=1;strokeColor=none;fillColor=none;fontSize=9;fontColor=#6B7280;align=center;" vertex="1" parent="1">
+      <mxGeometry x="440" y="117" width="120" height="14" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 2 — FRONTEND (Next.js, 3 views) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="fe_bg" value="Frontend — Next.js  (one app, role-gated views)" style="swimlane;startSize=28;fillColor=#EEF2FF;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="148" width="1540" height="130" as="geometry" />
+    </mxCell>
+
+    <!-- Executive view -->
+    <mxCell id="fe_exec" value="Executive View  /dashboard" style="rounded=1;fillColor=#DDD6FE;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=10;fontStyle=1;" vertex="1" parent="fe_bg">
+      <mxGeometry x="20" y="38" width="300" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="fe_exec_d" value="All candidates · their current channel · readiness score · interview-ready flag" style="text;html=1;fontSize=9;fontColor=#5B21B6;align=center;" vertex="1" parent="fe_bg">
+      <mxGeometry x="20" y="80" width="300" height="30" as="geometry" />
+    </mxCell>
+
+    <!-- Feeder view -->
+    <mxCell id="fe_feed" value="Feeder View  /pipeline" style="rounded=1;fillColor=#DDD6FE;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=10;fontStyle=1;" vertex="1" parent="fe_bg">
+      <mxGeometry x="380" y="38" width="340" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="fe_feed_d" value="Create / edit learning path · add sections · set concepts · add eval patterns · write sample questions · publish" style="text;html=1;fontSize=9;fontColor=#5B21B6;align=center;" vertex="1" parent="fe_bg">
+      <mxGeometry x="380" y="80" width="340" height="30" as="geometry" />
+    </mxCell>
+
+    <!-- Candidate view -->
+    <mxCell id="fe_cand" value="Candidate View  /chat   /test   /mock   /progress" style="rounded=1;fillColor=#DDD6FE;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=10;fontStyle=1;" vertex="1" parent="fe_bg">
+      <mxGeometry x="780" y="38" width="740" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="fe_cand_d" value="/chat — mentor chat window    /test — preliminary and advancement tests    /mock — interview simulation    /progress — channel, covered concepts, gaps, readiness score" style="text;html=1;fontSize=9;fontColor=#5B21B6;align=center;" vertex="1" parent="fe_bg">
+      <mxGeometry x="780" y="80" width="740" height="30" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 3 — BACKEND (FastAPI routers) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="be_bg" value="Backend — FastAPI  (single process, 5 routers)" style="swimlane;startSize=28;fillColor=#F0FDF4;strokeColor=#16A34A;fontColor=#14532D;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="318" width="1540" height="210" as="geometry" />
+    </mxCell>
+
+    <!-- router: candidates -->
+    <mxCell id="rt_cand" value="router/candidate.py" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;fontStyle=1;" vertex="1" parent="be_bg">
+      <mxGeometry x="20" y="38" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="rt_cand_d" value="POST   /candidates&#xa;GET    /candidates/{id}&#xa;PUT    /candidates/{id}/pipeline&#xa;GET    /candidates/{id}/progress&#xa;&#xa;On PUT pipeline → auto-build preliminary test&#xa;                → trigger Plan Gen Agent" style="text;html=1;fontSize=8;fontColor=#14532D;align=left;" vertex="1" parent="be_bg">
+      <mxGeometry x="20" y="78" width="220" height="96" as="geometry" />
+    </mxCell>
+
+    <!-- router: pipeline -->
+    <mxCell id="rt_pipe" value="router/pipeline.py" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;fontStyle=1;" vertex="1" parent="be_bg">
+      <mxGeometry x="260" y="38" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="rt_pipe_d" value="POST   /pipelines&#xa;PUT    /pipelines/{id}&#xa;POST   /pipelines/{id}/sections&#xa;POST   /pipelines/{id}/publish&#xa;&#xa;On publish → trigger Question Gen Agent&#xa;           → trigger Rubric Gen (same run)" style="text;html=1;fontSize=8;fontColor=#14532D;align=left;" vertex="1" parent="be_bg">
+      <mxGeometry x="260" y="78" width="220" height="96" as="geometry" />
+    </mxCell>
+
+    <!-- router: session (STAR) -->
+    <mxCell id="rt_sess" value="router/session.py  ★  (orchestrator)" style="rounded=1;fillColor=#86EFAC;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;fontStyle=1;strokeWidth=2;" vertex="1" parent="be_bg">
+      <mxGeometry x="500" y="38" width="320" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="rt_sess_d" value="POST   /sessions&#xa;POST   /sessions/{id}/chat  ← main chat turn&#xa;GET    /sessions/{id}/gate-status&#xa;POST   /sessions/{id}/end&#xa;&#xa;Each chat turn:&#xa;  1. call Mentor Agent (stream response)&#xa;  2. parse signal tag → concept_tag + quality&#xa;  3. write session_answers row&#xa;  4. call record_answer_topic() → update covered_concepts&#xa;  5. call check_topic_gate() → gate ready?&#xa;  6. if gate fires → call Evaluator Agent → update channel" style="text;html=1;fontSize=8;fontColor=#14532D;align=left;" vertex="1" parent="be_bg">
+      <mxGeometry x="500" y="78" width="320" height="114" as="geometry" />
+    </mxCell>
+
+    <!-- router: assessment -->
+    <mxCell id="rt_assess" value="router/assessment.py" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;fontStyle=1;" vertex="1" parent="be_bg">
+      <mxGeometry x="840" y="38" width="260" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="rt_assess_d" value="POST   /assessments           ← create test&#xa;POST   /assessments/{id}/submit ← candidate done&#xa;GET    /assessments/{id}/result&#xa;&#xa;On submit → call Evaluator Agent&#xa;  returns: level + channel + gaps + strengths&#xa;  router writes result to candidates table" style="text;html=1;fontSize=8;fontColor=#14532D;align=left;" vertex="1" parent="be_bg">
+      <mxGeometry x="840" y="78" width="260" height="96" as="geometry" />
+    </mxCell>
+
+    <!-- router: questions -->
+    <mxCell id="rt_q" value="router/questions.py" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;fontStyle=1;" vertex="1" parent="be_bg">
+      <mxGeometry x="1120" y="38" width="260" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="rt_q_d" value="POST   /questions/generate&#xa;GET    /questions?concept=&amp;band=&amp;type=&#xa;&#xa;On generate → call Question Gen Agent&#xa;  creates 9 variants per seed&#xa;  (3 bands × 3 question types)&#xa;  each question tagged with:&#xa;  concept_tag · difficulty_band · seniority" style="text;html=1;fontSize=8;fontColor=#14532D;align=left;" vertex="1" parent="be_bg">
+      <mxGeometry x="1120" y="78" width="260" height="96" as="geometry" />
+    </mxCell>
+
+    <!-- middleware bar -->
+    <mxCell id="be_mid" value="Shared middleware: JWT auth  ·  role guard (executive / feeder / candidate)  ·  CORS" style="rounded=1;fillColor=#DCFCE7;strokeColor=#16A34A;fontColor=#14532D;fontSize=9;align=center;" vertex="1" parent="be_bg">
+      <mxGeometry x="20" y="184" width="1500" height="20" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 4 — CORE LOGIC (no LLM — pure Python) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="logic_bg" value="Core Logic — plain Python, no LLM calls" style="swimlane;startSize=28;fillColor=#F8FAFC;strokeColor=#6B7280;fontColor=#374151;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="568" width="1540" height="150" as="geometry" />
+    </mxCell>
+
+    <!-- topic gate -->
+    <mxCell id="lg_gate" value="core/topic_gate.py" style="rounded=1;fillColor=#F3F4F6;strokeColor=#6B7280;fontColor=#374151;fontSize=10;fontStyle=1;" vertex="1" parent="logic_bg">
+      <mxGeometry x="20" y="38" width="460" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="lg_gate_d" value="record_answer_topic(session_id, concept_tag)&#xa;  → appends concept to session.covered_concepts, increments answer_count&#xa;&#xa;check_topic_gate(session_id) → GateResult&#xa;  → if answer_count ≥ 3 AND covered_concepts ⊇ required_concepts → should_fire = True&#xa;  → called by session router after EVERY answered question&#xa;  → ALSO used by Improvement channel: required_concepts = gap concepts only" style="text;html=1;fontSize=8;fontColor=#374151;align=left;" vertex="1" parent="logic_bg">
+      <mxGeometry x="20" y="78" width="460" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- question selector -->
+    <mxCell id="lg_qsel" value="core/question_selector.py" style="rounded=1;fillColor=#F3F4F6;strokeColor=#6B7280;fontColor=#374151;fontSize=10;fontStyle=1;" vertex="1" parent="logic_bg">
+      <mxGeometry x="500" y="38" width="500" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="lg_qsel_d" value="select_band(channel, attempt_count, last_quality) → band string&#xa;  attempt 1 or absent → one band below channel ceiling    ·    wrong/partial → foundational    ·    correct 2nd+ → ceiling band&#xa;&#xa;fetch_question(candidate_id, concept_tag, band, seniority, pattern_type, session_ids) → Question&#xa;  Layer 1: exclude session_question_ids (in-memory set)    ·    Layer 2: exclude questions last_quality=correct (1 DB read)&#xa;  Fallback A: drop history filter if pool empty    ·    Fallback B: return None → mentor asks freeform" style="text;html=1;fontSize=8;fontColor=#374151;align=left;" vertex="1" parent="logic_bg">
+      <mxGeometry x="500" y="78" width="500" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- preliminary test builder -->
+    <mxCell id="lg_prelim" value="core/preliminary_test.py" style="rounded=1;fillColor=#F3F4F6;strokeColor=#6B7280;fontColor=#374151;fontSize=10;fontStyle=1;" vertex="1" parent="logic_bg">
+      <mxGeometry x="1020" y="38" width="500" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="lg_prelim_d" value="build_preliminary_test(section_id) → list of Questions&#xa;  Deterministic — no LLM. Queries one is_preliminary=True question per concept_tag in the section&#xa;  Falls back to one foundational-band question per concept if no seed is marked preliminary&#xa;  Called by router/candidate.py when Feeder assigns a learning path to a candidate" style="text;html=1;fontSize=8;fontColor=#374151;align=left;" vertex="1" parent="logic_bg">
+      <mxGeometry x="1020" y="78" width="500" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 5 — AI AGENTS -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="ag_bg" value="AI Agents — 4 agents, called inline from routers" style="swimlane;startSize=28;fillColor=#FFF7ED;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="758" width="1540" height="250" as="geometry" />
+    </mxCell>
+
+    <!-- Mentor Agent -->
+    <mxCell id="ag_mentor" value="Mentor Agent  agents/mentor.py" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=10;fontStyle=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="20" y="38" width="360" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="ag_mentor_d" value="Model: claude-sonnet-4-6  (streaming)&#xa;Called by: router/session.py on every chat turn&#xa;&#xa;Reads each turn: channel · gaps · strengths · candidate plan&#xa;  section description · eval pattern description · covered_concepts&#xa;  required_concepts (so it can bias toward uncovered topics)&#xa;&#xa;technique_selector(quality, attempt_count, channel) picks from 8 techniques&#xa;  → builds system prompt with channel persona + technique instruction&#xa;  → appends hidden &lt;signal&gt;{concept_tag, quality}&lt;/signal&gt; to every response&#xa;&#xa;Output: streamed text (signal tag stripped before client sees it)&#xa;Signal tag parsed by session router to feed topic gate and question selector&#xa;&#xa;Does NOT plan sessions. Does NOT trigger assessments. Executes only." style="text;html=1;fontSize=8;fontColor=#7C2D12;align=left;fillColor=#FFEDD5;strokeColor=#FED7AA;rounded=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="20" y="78" width="360" height="160" as="geometry" />
+    </mxCell>
+
+    <!-- Evaluator Agent -->
+    <mxCell id="ag_eval" value="Evaluator Agent  agents/evaluator.py" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=10;fontStyle=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="400" y="38" width="360" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="ag_eval_d" value="Model: claude-haiku-4-5  (fast, non-streaming)&#xa;Called by: router/assessment.py AND router/session.py (when gate fires)&#xa;&#xa;SAME agent handles ALL 3 triggers — only the input changes:&#xa;  trigger=preliminary_test  → raw test answers → sets first channel&#xa;  trigger=topic_gate        → session answers  → advances or stays&#xa;  trigger=mock_interview    → full mock transcript → section complete?&#xa;&#xa;Receives: answers[] + rubric (generated at publish time) + seniority&#xa;Returns strict JSON:&#xa;  { level, channel, gaps[], strengths[], scores{accuracy,fluency,depth}, feedback }&#xa;&#xa;★ Channel assignment ONLY happens here. Nowhere else in the system.&#xa;  Router writes channel + gaps + strengths + level back to candidates table." style="text;html=1;fontSize=8;fontColor=#7C2D12;align=left;fillColor=#FFEDD5;strokeColor=#FED7AA;rounded=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="400" y="78" width="360" height="160" as="geometry" />
+    </mxCell>
+
+    <!-- Question Gen Agent -->
+    <mxCell id="ag_qgen" value="Question Gen Agent  agents/question_gen.py" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=10;fontStyle=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="780" y="38" width="360" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="ag_qgen_d" value="Model: claude-sonnet-4-6  (non-streaming)&#xa;Called by: router/questions.py when Feeder publishes a learning path&#xa;Also generates rubrics in the same run (no separate agent needed)&#xa;&#xa;Receives: seed questions · concept list · seniority · section · pattern descriptions&#xa;&#xa;For EACH seed question generates 9 variants:&#xa;  3 difficulty bands × 3 question types&#xa;  bands:  foundational · deepdive · interview_ready&#xa;  types:  conceptual · scenario · problem_solving&#xa;&#xa;Each generated question is stored with:&#xa;  concept_tag  (matches section concept list — used by topic gate)&#xa;  difficulty_band  (used by question selector)&#xa;  seniority    (relative to learning path — junior/mid/senior)&#xa;  is_preliminary flag (one per concept for cold-start test)" style="text;html=1;fontSize=8;fontColor=#7C2D12;align=left;fillColor=#FFEDD5;strokeColor=#FED7AA;rounded=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="780" y="78" width="360" height="160" as="geometry" />
+    </mxCell>
+
+    <!-- Plan Gen Agent -->
+    <mxCell id="ag_plan" value="Plan Gen Agent  agents/plan_gen.py" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=10;fontStyle=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="1160" y="38" width="360" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="ag_plan_d" value="Model: claude-sonnet-4-6  (non-streaming)&#xa;Called by: router/candidate.py ONCE when learning path assigned&#xa;Runs AFTER preliminary test results are available&#xa;&#xa;Receives: preliminary test result (level, gaps, strengths)&#xa;  full learning path (sections, concepts, eval patterns, seniority)&#xa;&#xa;Generates a personalised candidate_plan:&#xa;  section_order[]     which sections in what sequence&#xa;  concept_weights{}   which concepts to emphasise more&#xa;  pattern_weights{}   which eval patterns to use more&#xa;  difficulty_start{}  starting band per concept&#xa;&#xa;Stored once. Mentor Agent reads this plan on every chat turn.&#xa;Plan can be updated by Evaluator Agent if channel changes significantly." style="text;html=1;fontSize=8;fontColor=#7C2D12;align=left;fillColor=#FFEDD5;strokeColor=#FED7AA;rounded=1;" vertex="1" parent="ag_bg">
+      <mxGeometry x="1160" y="78" width="360" height="160" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 6 — CHANNEL STATE -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="ch_bg" value="Channel State — stored as candidate.channel in DB, read by Mentor Agent each turn, written ONLY by Evaluator Agent" style="swimlane;startSize=28;fillColor=#FFFBEB;strokeColor=#D97706;fontColor=#78350F;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="1048" width="1540" height="120" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ch1" value="foundation&#xa;accuracy ≥ 60 · fluency ≥ 50" style="rounded=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=10;fontStyle=1;" vertex="1" parent="ch_bg">
+      <mxGeometry x="20" y="38" width="330" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ch1_d" value="Teach before test · scaffold + analogy · no time pressure · Goal: concept coverage at basic correctness" style="text;html=1;fontSize=8;fontColor=#78350F;align=center;" vertex="1" parent="ch_bg">
+      <mxGeometry x="20" y="82" width="330" height="28" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ch2" value="deepdive&#xa;accuracy ≥ 75 · depth ≥ 65 · fluency ≥ 65" style="rounded=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=10;fontStyle=1;" vertex="1" parent="ch_bg">
+      <mxGeometry x="380" y="38" width="350" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ch2_d" value="Challenge + Socratic + constraint injection · Goal: trade-off reasoning and edge-case awareness" style="text;html=1;fontSize=8;fontColor=#78350F;align=center;" vertex="1" parent="ch_bg">
+      <mxGeometry x="380" y="82" width="350" height="28" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ch3" value="simulation&#xa;accuracy ≥ 85 · depth ≥ 80 · fluency ≥ 75" style="rounded=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=10;fontStyle=1;" vertex="1" parent="ch_bg">
+      <mxGeometry x="760" y="38" width="380" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ch3_d" value="Mentor = interviewer · no hints · time pressure · debrief only · Goal: interview performance · interview_ready flag set on completion" style="text;html=1;fontSize=8;fontColor=#78350F;align=center;" vertex="1" parent="ch_bg">
+      <mxGeometry x="760" y="82" width="380" height="28" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ch4" value="improvement  (detour — not a progression step)" style="rounded=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=10;fontStyle=1;" vertex="1" parent="ch_bg">
+      <mxGeometry x="1170" y="38" width="350" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="ch4_d" value="Triggered from ANY channel when critical gap found · saves pre_improvement_channel · topic gate targets gap concepts only · returns to saved channel when gaps closed" style="text;html=1;fontSize=8;fontColor=#78350F;align=center;" vertex="1" parent="ch_bg">
+      <mxGeometry x="1170" y="82" width="350" height="28" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- ROW 7 — DATA LAYER -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="db_bg" value="Data Layer" style="swimlane;startSize=28;fillColor=#EFF6FF;strokeColor=#2563EB;fontColor=#1E3A8A;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="1198" width="1540" height="170" as="geometry" />
+    </mxCell>
+
+    <!-- Postgres -->
+    <mxCell id="db_pg" value="PostgreSQL  (main DB)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#BFDBFE;strokeColor=#2563EB;fontColor=#1E3A8A;fontSize=10;fontStyle=1;" vertex="1" parent="db_bg">
+      <mxGeometry x="20" y="36" width="240" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="db_pg_d" value="users · candidates★ · learning_paths&#xa;sections · eval_patterns · concepts&#xa;questions★ · rubrics · sessions★&#xa;session_answers · assessments&#xa;candidate_plans · candidate_question_history&#xa;★ = key tables for channel + gate + selection" style="text;html=1;fontSize=8;fontColor=#1E3A8A;align=center;" vertex="1" parent="db_bg">
+      <mxGeometry x="20" y="120" width="240" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- key columns callout -->
+    <mxCell id="db_cols" value="Key columns the system depends on" style="rounded=1;fillColor=#DBEAFE;strokeColor=#2563EB;fontColor=#1E3A8A;fontSize=10;fontStyle=1;" vertex="1" parent="db_bg">
+      <mxGeometry x="280" y="36" width="480" height="30" as="geometry" />
+    </mxCell>
+    <mxCell id="db_cols_d" value="candidates:  channel · level · gaps[] · strengths[] · pre_improvement_channel · interview_ready · plan_id&#xa;questions:   concept_tag · difficulty_band · seniority · pattern_type · is_preliminary · status&#xa;sessions:    covered_concepts[] · required_concepts[] · answer_count · current_concept_tag&#xa;cand_q_hist: candidate_id · question_id · last_quality · times_seen" style="text;html=1;fontSize=8;fontColor=#1E3A8A;align=left;" vertex="1" parent="db_bg">
+      <mxGeometry x="280" y="70" width="480" height="90" as="geometry" />
+    </mxCell>
+
+    <!-- In-memory -->
+    <mxCell id="db_mem" value="In-process Python dict{}" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#BFDBFE;strokeColor=#2563EB;fontColor=#1E3A8A;fontSize=10;fontStyle=1;" vertex="1" parent="db_bg">
+      <mxGeometry x="780" y="36" width="220" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="db_mem_d" value="session_id → last 6 chat turns&#xa;session_id → session_question_ids set&#xa;(lives in FastAPI app memory)" style="text;html=1;fontSize=8;fontColor=#1E3A8A;align=center;" vertex="1" parent="db_bg">
+      <mxGeometry x="780" y="120" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Anthropic API -->
+    <mxCell id="db_api" value="Anthropic API" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#BFDBFE;strokeColor=#2563EB;fontColor=#1E3A8A;fontSize=10;fontStyle=1;" vertex="1" parent="db_bg">
+      <mxGeometry x="1020" y="36" width="220" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="db_api_d" value="claude-sonnet-4-6&#xa;  Mentor · Question Gen · Plan Gen&#xa;claude-haiku-4-5&#xa;  Evaluator (fast + cheap)" style="text;html=1;fontSize=8;fontColor=#1E3A8A;align=center;" vertex="1" parent="db_bg">
+      <mxGeometry x="1020" y="120" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- .env -->
+    <mxCell id="db_env" value=".env config" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#BFDBFE;strokeColor=#2563EB;fontColor=#1E3A8A;fontSize=10;fontStyle=1;" vertex="1" parent="db_bg">
+      <mxGeometry x="1260" y="36" width="220" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="db_env_d" value="DATABASE_URL&#xa;ANTHROPIC_API_KEY&#xa;JWT_SECRET" style="text;html=1;fontSize=8;fontColor=#1E3A8A;align=center;" vertex="1" parent="db_bg">
+      <mxGeometry x="1260" y="120" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CANDIDATE JOURNEY (right side annotation) -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="journey_bg" value="Candidate Journey (what happens step by step)" style="swimlane;startSize=26;fillColor=#F9FAFB;strokeColor=#6B7280;fontColor=#374151;fontSize=10;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="1614" y="148" width="240" height="830" as="geometry" />
+    </mxCell>
+
+    <mxCell id="j1" value="1. Feeder assigns learning path" style="rounded=1;fillColor=#E0E7FF;strokeColor=#6366F1;fontColor=#3730A3;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="30" width="220" height="30" as="geometry" />
+    </mxCell>
+    <mxCell id="j2" value="2. Preliminary test auto-built&#xa;(1 question per concept, no LLM)" style="rounded=1;fillColor=#E0E7FF;strokeColor=#6366F1;fontColor=#3730A3;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="72" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="j3" value="3. Candidate takes preliminary test" style="rounded=1;fillColor=#E0E7FF;strokeColor=#6366F1;fontColor=#3730A3;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="120" width="220" height="30" as="geometry" />
+    </mxCell>
+    <mxCell id="j4" value="4. Evaluator Agent runs&#xa;→ sets level, channel, gaps, strengths" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="162" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="j5" value="5. Plan Gen Agent runs&#xa;→ creates personalised session plan" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="210" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="j6" value="6. Candidate chats with Mentor&#xa;Mentor reads plan + channel + gaps" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="258" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="j7" value="7. Each answered question:&#xa;topic gate updated · band selected&#xa;question_history updated" style="rounded=1;fillColor=#F3F4F6;strokeColor=#6B7280;fontColor=#374151;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="306" width="220" height="46" as="geometry" />
+    </mxCell>
+    <mxCell id="j8" value="8. When all concepts covered&#xa;topic gate fires →&#xa;Evaluator Agent runs" style="rounded=1;fillColor=#FED7AA;strokeColor=#EA580C;fontColor=#7C2D12;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="364" width="220" height="46" as="geometry" />
+    </mxCell>
+    <mxCell id="j9" value="9a. Scores met → advance channel&#xa;9b. Scores not met → stay + improve&#xa;9c. Regressed → drop channel" style="rounded=1;fillColor=#FEF3C7;strokeColor=#D97706;fontColor=#78350F;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="422" width="220" height="46" as="geometry" />
+    </mxCell>
+    <mxCell id="j10" value="10. Repeat steps 6-9 per section&#xa;until all sections complete" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="480" width="220" height="36" as="geometry" />
+    </mxCell>
+    <mxCell id="j11" value="11. Simulation channel complete&#xa;→ interview_ready = True&#xa;→ visible on Executive Dashboard" style="rounded=1;fillColor=#DDD6FE;strokeColor=#7C3AED;fontColor=#4C1D95;fontSize=9;" vertex="1" parent="journey_bg">
+      <mxGeometry x="10" y="528" width="220" height="46" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- EDGES — Users to Frontend -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="e_exec_fe" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="u_exec" target="fe_exec" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_feed_fe" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="u_feeder" target="fe_feed" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_cand_fe" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="u_cand" target="fe_cand" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Frontend to Backend routers -->
+    <mxCell id="e_fe_exec_rt" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;" edge="1" source="fe_exec" target="rt_cand" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_fe_feed_rt" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;" edge="1" source="fe_feed" target="rt_pipe" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_fe_cand_sess" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;" edge="1" source="fe_cand" target="rt_sess" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_fe_cand_assess" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;" edge="1" source="fe_cand" target="rt_assess" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_fe_feed_q" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;rounded=0;" edge="1" source="fe_feed" target="rt_q" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Routers to Core Logic -->
+    <mxCell id="e_sess_gate" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6B7280;rounded=0;" edge="1" source="rt_sess" target="lg_gate" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_sess_qsel" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6B7280;rounded=0;" edge="1" source="rt_sess" target="lg_qsel" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_cand_prelim" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6B7280;rounded=0;" edge="1" source="rt_cand" target="lg_prelim" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Routers to Agents (dashed orange) -->
+    <mxCell id="e_sess_mentor" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#EA580C;dashed=1;rounded=0;" edge="1" source="rt_sess" target="ag_mentor" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_assess_eval" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#EA580C;dashed=1;rounded=0;" edge="1" source="rt_assess" target="ag_eval" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_sess_eval" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#EA580C;dashed=1;rounded=0;" edge="1" source="rt_sess" target="ag_eval" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="820" y="720" />
+          <mxPoint x="580" y="720" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_sess_eval_l" value="when gate fires" style="edgeLabel;html=1;fontSize=8;fontColor=#EA580C;" vertex="1" connectable="0" parent="e_sess_eval">
+      <mxGeometry relative="0.5" as="geometry" />
+    </mxCell>
+    <mxCell id="e_q_qgen" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#EA580C;dashed=1;rounded=0;" edge="1" source="rt_q" target="ag_qgen" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_cand_plan" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#EA580C;dashed=1;rounded=0;" edge="1" source="rt_cand" target="ag_plan" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Evaluator writes to channel state -->
+    <mxCell id="e_eval_ch" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D97706;strokeWidth=2;rounded=0;" edge="1" source="ag_eval" target="ch_bg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_eval_ch_l" value="writes channel + gaps" style="edgeLabel;html=1;fontSize=8;fontColor=#D97706;" vertex="1" connectable="0" parent="e_eval_ch">
+      <mxGeometry relative="0.5" as="geometry" />
+    </mxCell>
+
+    <!-- Channel state to Mentor Agent (read) -->
+    <mxCell id="e_ch_mentor" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D97706;dashed=1;rounded=0;" edge="1" source="ch_bg" target="ag_mentor" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_ch_mentor_l" value="reads each turn" style="edgeLabel;html=1;fontSize=8;fontColor=#D97706;" vertex="1" connectable="0" parent="e_ch_mentor">
+      <mxGeometry relative="0.5" as="geometry" />
+    </mxCell>
+
+    <!-- Agents + logic to DB -->
+    <mxCell id="e_ag_mentor_db" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;rounded=0;" edge="1" source="ag_mentor" target="db_pg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_ag_eval_db" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;rounded=0;" edge="1" source="ag_eval" target="db_pg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_ag_qgen_db" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;rounded=0;" edge="1" source="ag_qgen" target="db_pg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_ag_plan_db" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;rounded=0;" edge="1" source="ag_plan" target="db_pg" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_ag_mentor_mem" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;rounded=0;" edge="1" source="ag_mentor" target="db_mem" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Agents to Anthropic API -->
+    <mxCell id="e_mentor_api" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;dashed=1;rounded=0;" edge="1" source="ag_mentor" target="db_api" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_eval_api" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;dashed=1;rounded=0;" edge="1" source="ag_eval" target="db_api" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_qgen_api" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;dashed=1;rounded=0;" edge="1" source="ag_qgen" target="db_api" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="e_plan_api" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;dashed=1;rounded=0;" edge="1" source="ag_plan" target="db_api" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- LEGEND -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="leg_bg" value="Legend" style="swimlane;startSize=22;fillColor=#F9FAFB;strokeColor=#6B7280;fontSize=9;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="1388" width="900" height="54" as="geometry" />
+    </mxCell>
+
+    <mxCell id="la" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#7C3AED;" edge="1" parent="leg_bg">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="20" y="38"/><mxPoint x="70" y="38"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="lal" value="User / UI → Backend call" style="text;html=1;fontSize=9;" vertex="1" parent="leg_bg">
+      <mxGeometry x="74" y="30" width="130" height="18" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lb" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#EA580C;dashed=1;" edge="1" parent="leg_bg">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="230" y="38"/><mxPoint x="280" y="38"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="lbl" value="Router → Agent (LLM call)" style="text;html=1;fontSize=9;" vertex="1" parent="leg_bg">
+      <mxGeometry x="284" y="30" width="140" height="18" as="geometry" />
+    </mxCell>
+
+    <mxCell id="lc" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D97706;strokeWidth=2;" edge="1" parent="leg_bg">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="450" y="38"/><mxPoint x="500" y="38"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="lcl" value="Evaluator writes channel (solid)" style="text;html=1;fontSize=9;" vertex="1" parent="leg_bg">
+      <mxGeometry x="504" y="30" width="160" height="18" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ld" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2563EB;" edge="1" parent="leg_bg">
+      <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="690" y="38"/><mxPoint x="740" y="38"/></Array></mxGeometry>
+    </mxCell>
+    <mxCell id="ldl" value="→ Database / Anthropic API" style="text;html=1;fontSize=9;" vertex="1" parent="leg_bg">
+      <mxGeometry x="744" y="30" width="148" height="18" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>

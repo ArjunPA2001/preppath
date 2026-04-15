@@ -9,7 +9,7 @@
 <body class="bg-gray-50 min-h-screen">
 
   <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-    <a href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
+    <a id="nav-home" href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
     <span class="text-lg font-bold text-indigo-600" id="nav-title">Assessment</span>
   </nav>
 
@@ -90,7 +90,7 @@
         </div>
       </div>
 
-      <a href="/static/index.html"
+      <a id="continue-btn" href="/static/index.html"
          class="block w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-xl transition">
         Continue to Mentoring →
       </a>
@@ -100,6 +100,10 @@
   <script>
     const urlParams = new URLSearchParams(location.search);
     const CANDIDATE_ID = parseInt(urlParams.get('candidate_id')) || 1;
+
+    // Wire candidate_id into nav links now that we have it
+    document.getElementById('nav-home').href = `/static/index.html?candidate_id=${CANDIDATE_ID}`;
+    document.getElementById('continue-btn').href = `/static/index.html?candidate_id=${CANDIDATE_ID}`;
     const ASSESSMENT_ID_PARAM = urlParams.get('assessment_id');
     const TEST_TYPE = urlParams.get('type') || 'preliminary_test';
     const IS_ADVANCEMENT = TEST_TYPE === 'topic_gate';

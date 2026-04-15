@@ -9,6 +9,21 @@ class LearningPath(Base):
     name = Column(String, nullable=False)
     description = Column(Text)
     seniority = Column(String, default="mid")  # junior | mid | senior
+    language = Column(String, default="")
+    # JSON list of sample question strings, used as style hints by question_gen
+    sample_questions = Column(Text, default="[]")
+    status = Column(String, default="draft")  # draft | published
+
+
+class EvalPattern(Base):
+    __tablename__ = "eval_patterns"
+    id = Column(Integer, primary_key=True, index=True)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    # JSON list of sample question strings for this pattern (e.g. code snippets, DSA problems)
+    sample_patterns = Column(Text, default="[]")
+    order_index = Column(Integer, default=0)
 
 
 class Section(Base):

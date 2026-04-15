@@ -9,7 +9,7 @@
 <body class="bg-gray-50 min-h-screen">
 
   <nav class="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-    <a href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
+    <a id="nav-home" href="/static/index.html" class="text-gray-400 hover:text-gray-600 text-sm">← Home</a>
     <span class="text-lg font-bold text-indigo-600">Progress Overview</span>
   </nav>
 
@@ -88,7 +88,8 @@
   </div>
 
   <script>
-    const CANDIDATE_ID = 1;
+    const params = new URLSearchParams(location.search);
+    const CANDIDATE_ID = parseInt(params.get('candidate_id') || '1');
 
     const CHANNEL_INFO = {
       foundation: {
@@ -112,6 +113,8 @@
         card: 'bg-orange-50 text-orange-900',
       },
     };
+
+    document.getElementById('nav-home').href = `/static/index.html?candidate_id=${CANDIDATE_ID}`;
 
     async function load() {
       const [candRes, progRes] = await Promise.all([

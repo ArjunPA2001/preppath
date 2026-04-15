@@ -67,7 +67,33 @@ def create_assessment(body: CreateAssessmentRequest, db: DBSession = Depends(get
         raise HTTPException(status_code=404, detail="Candidate not found")
 
     if body.assessment_type == "preliminary_test":
-        questions = build_preliminary_test(db)
+        # If PUT /pipeline already pre-created a pending preliminary assessment, reuse it
+        existing = (
+            db.query(models.Assessment)
+            .filter_by(candidate_id=body.candidate_id, assessment_type="preliminary_test", status="pending")
+            .first()
+        )
+        if existing:
+            question_ids = json.loads(existing.question_ids or "[]")
+            qs = db.query(models.Question).filter(models.Question.id.in_(question_ids)).all()
+            q_map = {q.id: q for q in qs}
+            questions = [
+                {"question_id": qid, "text": q_map[qid].text, "concept_tag": q_map[qid].concept_tag}
+                for qid in question_ids if qid in q_map
+            ]
+            return {
+                "assessment_id": existing.id,
+                "assessment_type": "preliminary_test",
+                "questions": questions,
+            }
+
+        # No pre-created assessment — build one fresh scoped to this candidate's path
+        path_section_ids = None
+        if candidate.learning_path_id:
+            path_section_ids = [
+                s.id for s in db.query(models.Section).filter_by(learning_path_id=candidate.learning_path_id).all()
+            ]
+        questions = build_preliminary_test(db, section_ids=path_section_ids)
         if not questions:
             raise HTTPException(status_code=500, detail="No preliminary questions found in database")
         question_ids = [q["question_id"] for q in questions]

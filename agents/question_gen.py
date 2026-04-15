@@ -176,10 +176,15 @@ def generate_for_concept(
         if (band, ptype) in existing_combos:
             continue
 
-        # Ensure only one preliminary per concept across the whole DB
-        is_prelim = bool(q.get("is_preliminary")) and not has_preliminary
+        # Deterministically mark the foundational+conceptual question as preliminary.
+        # Do NOT trust the LLM flag — it is unreliable. We own this decision.
+        is_prelim = (
+            not has_preliminary
+            and band == "foundational"
+            and ptype == "conceptual"
+        )
         if is_prelim:
-            has_preliminary = True  # only flag the first one
+            has_preliminary = True
 
         db.add(
             models.Question(
@@ -194,6 +199,22 @@ def generate_for_concept(
         )
         existing_combos.add((band, ptype))
         added += 1
+
+    # Safety net: if we added questions but still have no preliminary question
+    # (e.g. LLM skipped foundational+conceptual), mark the first foundational question.
+    if added and not has_preliminary:
+        first_foundational = (
+            db.query(models.Question)
+            .filter_by(
+                concept_tag=concept_tag,
+                section_id=section.id,
+                difficulty_band="foundational",
+            )
+            .first()
+        )
+        if first_foundational:
+            first_foundational.is_preliminary = True
+            has_preliminary = True
 
     if added:
         db.commit()
