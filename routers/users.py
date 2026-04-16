@@ -40,6 +40,9 @@ class CreateUserRequest(BaseModel):
     name: str
     password: str
     role: str  # executive | feeder | candidate
+    # When a feeder/executive creates a candidate user, pass their own user.id here.
+    # Used for attribution in the executive dashboard. Ignored for non-candidate roles.
+    created_by_user_id: int | None = None
 
 
 class UpdateUserRequest(BaseModel):
@@ -47,6 +50,8 @@ class UpdateUserRequest(BaseModel):
     email: str | None = None
     role: str | None = None
     password: str | None = None
+    # Used when promoting a user to role=candidate and a new Candidate record is auto-created
+    created_by_user_id: int | None = None
 
 
 class LoginRequest(BaseModel):
@@ -113,6 +118,7 @@ def create_user(body: CreateUserRequest, db: DBSession = Depends(get_db)):
     if body.role == "candidate":
         candidate = models.Candidate(
             user_id=user.id,
+            created_by_user_id=body.created_by_user_id,
             channel="",
             level="",
             gaps=json.dumps([]),
@@ -183,6 +189,7 @@ def update_user(user_id: int, body: UpdateUserRequest, db: DBSession = Depends(g
             if not _get_candidate(db, user_id):
                 db.add(models.Candidate(
                     user_id=user_id,
+                    created_by_user_id=body.created_by_user_id,
                     channel="",
                     level="",
                     gaps=json.dumps([]),

@@ -78,6 +78,8 @@ class Candidate(Base):
     # 0–100 composite readiness score updated after each advancement assessment
     readiness_score = Column(Float, nullable=True)
     plan_id = Column(Integer, ForeignKey("candidate_plans.id"), nullable=True)
+    # Feeder (or executive) who created this candidate — used for attribution in the exec dashboard
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

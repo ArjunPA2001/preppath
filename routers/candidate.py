@@ -24,6 +24,7 @@ router = APIRouter()
 
 class CreateCandidateRequest(BaseModel):
     user_id: int
+    created_by_user_id: int | None = None
 
 
 class AssignPipelineRequest(BaseModel):
@@ -32,7 +33,11 @@ class AssignPipelineRequest(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _candidate_dict(c: models.Candidate, user: models.User | None = None) -> dict:
+def _candidate_dict(
+    c: models.Candidate,
+    user: models.User | None = None,
+    creator: models.User | None = None,
+) -> dict:
     return {
         "id": c.id,
         "user_id": c.user_id,
@@ -47,6 +52,9 @@ def _candidate_dict(c: models.Candidate, user: models.User | None = None) -> dic
         "interview_ready": c.interview_ready,
         "readiness_score": c.readiness_score,
         "plan_id": c.plan_id,
+        "created_by_user_id": c.created_by_user_id,
+        "created_by_name": creator.name if creator else "",
+        "created_by_role": creator.role if creator else "",
     }
 
 
@@ -81,6 +89,7 @@ def create_candidate(body: CreateCandidateRequest, db: DBSession = Depends(get_d
 
     candidate = models.Candidate(
         user_id=body.user_id,
+        created_by_user_id=body.created_by_user_id,
         channel="",
         level="",
         gaps=json.dumps([]),
@@ -89,22 +98,31 @@ def create_candidate(body: CreateCandidateRequest, db: DBSession = Depends(get_d
     db.add(candidate)
     db.commit()
     db.refresh(candidate)
-    return _candidate_dict(candidate, user)
+    creator = (
+        db.query(models.User).filter_by(id=candidate.created_by_user_id).first()
+        if candidate.created_by_user_id
+        else None
+    )
+    return _candidate_dict(candidate, user, creator)
 
 
 @router.get("")
 def list_candidates(db: DBSession = Depends(get_db)):
-    """List all candidates with their current channel and readiness state."""
+    """List all candidates with their current channel, readiness, path, and creator."""
     candidates = db.query(models.Candidate).order_by(models.Candidate.id).all()
 
     # Build lookups
     path_ids = {c.learning_path_id for c in candidates if c.learning_path_id}
     paths = {}
+    path_seniority = {}
     if path_ids:
         for lp in db.query(models.LearningPath).filter(models.LearningPath.id.in_(path_ids)).all():
             paths[lp.id] = lp.name
+            path_seniority[lp.id] = lp.seniority
 
+    # Candidate users + creator users in one query
     user_ids = {c.user_id for c in candidates if c.user_id}
+    user_ids |= {c.created_by_user_id for c in candidates if c.created_by_user_id}
     users = {}
     if user_ids:
         for u in db.query(models.User).filter(models.User.id.in_(user_ids)).all():
@@ -113,8 +131,13 @@ def list_candidates(db: DBSession = Depends(get_db)):
     return {
         "candidates": [
             {
-                **_candidate_dict(c, users.get(c.user_id)),
+                **_candidate_dict(
+                    c,
+                    users.get(c.user_id),
+                    users.get(c.created_by_user_id) if c.created_by_user_id else None,
+                ),
                 "learning_path_name": paths.get(c.learning_path_id, "") if c.learning_path_id else "",
+                "learning_path_seniority": path_seniority.get(c.learning_path_id, "") if c.learning_path_id else "",
             }
             for c in candidates
         ]
@@ -126,7 +149,12 @@ def get_candidate(candidate_id: int, db: DBSession = Depends(get_db)):
     candidate = db.query(models.Candidate).filter_by(id=candidate_id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return _candidate_dict(candidate, _user_for(db, candidate))
+    creator = (
+        db.query(models.User).filter_by(id=candidate.created_by_user_id).first()
+        if candidate.created_by_user_id
+        else None
+    )
+    return _candidate_dict(candidate, _user_for(db, candidate), creator)
 
 
 @router.put("/{candidate_id}/pipeline")
