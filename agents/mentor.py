@@ -112,7 +112,8 @@ def _build_system_prompt(
     current_question_text: str | None,
     technique_name: str,
     technique_instruction: str,
-    transitioned_from: str | None = None,
+    anticipated_next_concept_tag: str | None = None,
+    anticipated_next_question_text: str | None = None,
 ) -> str:
     persona = _PERSONAS.get(channel, _PERSONAS["foundation"])
     uncovered = [c for c in required_concepts if c not in covered_concepts]
@@ -123,28 +124,28 @@ def _build_system_prompt(
         else f"Explore the concept {current_concept_tag} conversationally — no set question."
     )
 
-    valid_concepts = ", ".join(required_concepts) if required_concepts else current_concept_tag
-
-    transition_block = ""
-    if transitioned_from and transitioned_from != current_concept_tag:
-        new_q_line = (
-            f'Introduce the new question naturally (do not quote verbatim):\n  "{current_question_text}"'
-            if current_question_text
-            else f"Open the new concept with a probing question."
+    # When the next concept is known, tell the mentor to pivot inline if the answer is correct.
+    # This prevents a stale "follow-up on A" question sitting in chat history when the candidate
+    # has already moved on to concept B in the system state.
+    advancement_block = ""
+    if anticipated_next_concept_tag and anticipated_next_concept_tag != current_concept_tag:
+        next_q_line = (
+            f'close {current_concept_tag} naturally, then introduce {anticipated_next_concept_tag} '
+            f'and ask this question (rephrase conversationally, don\'t quote verbatim):\n'
+            f'  "{anticipated_next_question_text}"'
+            if anticipated_next_question_text
+            else f'close {current_concept_tag} naturally and open {anticipated_next_concept_tag} with a probing question.'
         )
-        transition_block = f"""
+        advancement_block = f"""
 
-TOPIC TRANSITION (overrides rules 1 and 3 for this turn ONLY):
-The candidate just finished **{transitioned_from}** successfully. Your previous message ended with a follow-up question on {transitioned_from}, and the candidate's latest message is their reply to THAT question.
-This turn you MUST pivot:
-  1. Acknowledge their reply on {transitioned_from} in ONE short sentence (e.g. "Good — that's right.").
-  2. Announce you're moving on to **{current_concept_tag}**.
-  3. {new_q_line}
-  4. Your ending question MUST be about {current_concept_tag}, NOT {transitioned_from}. Do not probe {transitioned_from} any further.
-For the signal tag on this turn, concept_tag should be {transitioned_from} (that's what the candidate's message was about).
-"""
+ADVANCEMENT RULE — read before writing your response:
+  If the candidate's answer shows clear understanding (you are about to signal quality=correct),
+  do NOT end with another follow-up question about {current_concept_tag}.
+  Instead: {next_q_line}
+  Your ending question in this case MUST be about {anticipated_next_concept_tag}.
+  If the answer is partial or wrong, ignore this rule and continue probing {current_concept_tag}."""
 
-    return f"""You are {persona}{transition_block}
+    return f"""You are {persona}
 
 Context:
   Candidate level: {candidate_level} | Channel: {channel}
@@ -154,7 +155,7 @@ Context:
   {question_ctx}
   Candidate gaps: {gaps or 'none yet'} | Strengths: {strengths or 'none yet'}
 
-Teaching technique: {technique_name} — {technique_instruction}
+Teaching technique: {technique_name} — {technique_instruction}{advancement_block}
 
 CONVERSATION RULES (follow these strictly):
 1. RESPOND FIRST to exactly what the candidate just said.
@@ -163,7 +164,7 @@ CONVERSATION RULES (follow these strictly):
    - If they went off-topic: gently redirect back to {current_concept_tag}.
    - Never ignore what they said and jump straight into explaining.
 
-2. KEEP IT SHORT. 2–3 sentences of response, then ONE question. No long lectures.
+2. KEEP IT SHORT. 2-3 sentences of response, then ONE question. No long lectures.
    - If they need more explanation, give one example, then ask if that clarifies it.
    - If they understood, move the conversation forward with a harder follow-up.
 
@@ -175,9 +176,8 @@ CONVERSATION RULES (follow these strictly):
 
 5. After your response, append this hidden signal on its own line (never mention it to the candidate):
 <signal>{{"concept_tag":"CONCEPT","quality":"QUALITY"}}</signal>
-Replace CONCEPT with the concept this answer was actually about — must be one of: {valid_concepts}.
-Replace QUALITY with: wrong (misunderstood or no attempt), partial (on the right track but incomplete), correct (clear understanding shown).
-If the candidate's answer touched multiple concepts, pick the one most central to their response."""
+Replace CONCEPT with {current_concept_tag} — the concept the candidate was asked about this turn.
+Replace QUALITY with: wrong (misunderstood or no attempt), partial (on the right track but incomplete), correct (clear understanding shown)."""
 
 
 def extract_signal(text: str) -> dict | None:
@@ -227,7 +227,7 @@ def get_opening_message(
         f"Section: {section_name}\n"
         f"First concept to explore: {concept_display}\n"
         f"{gap_note}\n\n"
-        f"Write a SHORT opening message (2–3 sentences max) that:\n"
+        f"Write a SHORT opening message (2-3 sentences max) that:\n"
         f"1. Greets the candidate warmly and states what concept you'll start with.\n"
         f"2. {question_line}\n"
         f"3. Makes it clear they can ask doubts at any point.\n\n"
@@ -259,7 +259,8 @@ def stream_mentor_response(
     last_quality: str | None,
     chat_history: list[dict],
     user_message: str,
-    transitioned_from: str | None = None,
+    anticipated_next_concept_tag: str | None = None,
+    anticipated_next_question_text: str | None = None,
 ) -> tuple[str, dict | None]:
     """
     Call the Mentor Agent and return (clean_response, signal_dict).
@@ -282,7 +283,8 @@ def stream_mentor_response(
         current_question_text=current_question_text,
         technique_name=technique_name,
         technique_instruction=technique_instruction,
-        transitioned_from=transitioned_from,
+        anticipated_next_concept_tag=anticipated_next_concept_tag,
+        anticipated_next_question_text=anticipated_next_question_text,
     )
 
     messages = [{"role": "system", "content": system_prompt}]

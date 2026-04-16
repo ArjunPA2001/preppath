@@ -207,24 +207,14 @@ def chat(session_id: int, body: ChatRequest):
             )
             last_quality = last_answer.quality if last_answer else None
 
-            # The current question is whatever is cached from the previous turn.
-            # This is what the candidate is actually responding to right now.
-            # We must NOT advance to the next concept before calling the mentor —
-            # doing so would make the signal attribute the candidate's answer to the
-            # wrong concept (the one they haven't been asked yet).
+            # The cached question is the source of truth for what concept the candidate
+            # is currently responding to. Never trust session.current_concept_tag for this.
             cached_q = memory.get_current_question(session_id)
-            transitioned_from = None
 
             if cached_q:
-                # Candidate is responding to the question they were shown last turn.
                 concept_tag = cached_q["concept_tag"]
                 question_text = cached_q["text"]
                 question_id = cached_q["id"]
-                transitioned_from = cached_q.get("transitioned_from")
-                if transitioned_from:
-                    # Clear the flag so it only fires on this one turn.
-                    cached_q = {k: v for k, v in cached_q.items() if k != "transitioned_from"}
-                    memory.set_current_question(session_id, cached_q)
             else:
                 # No cached question (e.g. memory was cleared). Recover gracefully.
                 concept_tag = _pick_next_concept(session)
@@ -246,10 +236,28 @@ def chat(session_id: int, body: ChatRequest):
                     question_text = None
                     question_id = None
 
-            # Get candidate plan context
-            plan = None
-            if candidate.plan_id:
-                plan = db.query(models.CandidatePlan).filter_by(id=candidate.plan_id).first()
+            # Pre-compute where we'd go IF this answer turns out to be "correct".
+            # Pass this to the mentor so it can pivot inline — the mentor ends its
+            # response with a next-concept question when signaling correct, which
+            # keeps the chat history aligned with the system state from the start.
+            covered_now = set(json.loads(session.covered_concepts or "[]"))
+            required_list = json.loads(session.required_concepts or "[]")
+            hypothetical_covered = covered_now | {concept_tag}
+            anticipated_next_concept = None
+            anticipated_next_q = None
+            for c in required_list:
+                if c not in hypothetical_covered:
+                    anticipated_next_concept = c
+                    break
+            if anticipated_next_concept and anticipated_next_concept != concept_tag:
+                next_band = question_selector.select_band(candidate.channel, last_quality)
+                anticipated_next_q = question_selector.fetch_question(
+                    db=db,
+                    candidate_id=candidate.id,
+                    session_id=session_id,
+                    concept_tag=anticipated_next_concept,
+                    band=next_band,
+                )
 
             # Call Mentor Agent (collects full response, then returns)
             clean_response, signal = mentor.stream_mentor_response(
@@ -266,14 +274,17 @@ def chat(session_id: int, body: ChatRequest):
                 last_quality=last_quality,
                 chat_history=memory.get_history(session_id),
                 user_message=body.message,
-                transitioned_from=transitioned_from,
+                anticipated_next_concept_tag=anticipated_next_concept,
+                anticipated_next_question_text=anticipated_next_q.text if anticipated_next_q else None,
             )
 
-            # Extract concept_tag and quality from signal (fall back gracefully)
+            # concept_tag comes from the cached question (what the candidate was asked).
+            # We never trust the LLM's concept attribution — it can misattribute when the
+            # system prompt concept and the candidate's actual answer don't line up.
+            # We only trust the LLM for quality (correct / partial / wrong).
             sig_concept = concept_tag
             sig_quality = "partial"
             if signal:
-                sig_concept = signal.get("concept_tag", concept_tag)
                 sig_quality = signal.get("quality", "partial")
 
             # Update in-memory history
@@ -352,35 +363,25 @@ def chat(session_id: int, body: ChatRequest):
                     db.refresh(adv_assessment)
                     advancement_assessment_id = adv_assessment.id
 
-            # Work out what question the frontend should show after this turn
-            db.refresh(session)
-            next_concept = _pick_next_concept(session)
+            # Work out what question the frontend should show after this turn.
+            # If the answer was correct and we pre-fetched the next concept's question,
+            # swap the cache to that question now — the mentor's response should have
+            # already introduced it, so the next user message will be about it.
+            # If partial/wrong, keep the current question (stay on same concept).
             next_question = None
             if not gate_fired:
-                current_cached = memory.get_current_question(session_id)
-                if current_cached and current_cached.get("concept_tag") == next_concept:
-                    # Still on the same concept — keep showing the same question
-                    next_question = current_cached
+                if sig_quality == "correct" and anticipated_next_q:
+                    next_question = {
+                        "id": anticipated_next_q.id,
+                        "text": anticipated_next_q.text,
+                        "concept_tag": anticipated_next_q.concept_tag,
+                    }
+                    memory.set_current_question(session_id, next_question)
+                    session.current_concept_tag = anticipated_next_q.concept_tag
+                    db.commit()
                 else:
-                    # Concept advanced — fetch and cache a fresh question
-                    next_band = question_selector.select_band(candidate.channel, sig_quality)
-                    nq = question_selector.fetch_question(
-                        db=db,
-                        candidate_id=candidate.id,
-                        session_id=session_id,
-                        concept_tag=next_concept,
-                        band=next_band,
-                    )
-                    if nq:
-                        next_question = {"id": nq.id, "text": nq.text, "concept_tag": nq.concept_tag}
-                        # Mark the transition so the next turn's mentor prompt pivots
-                        # away from the just-finished concept instead of continuing it.
-                        cache_entry = dict(next_question)
-                        if sig_concept and sig_concept != nq.concept_tag:
-                            cache_entry["transitioned_from"] = sig_concept
-                        memory.set_current_question(session_id, cache_entry)
-                        session.current_concept_tag = nq.concept_tag
-                        db.commit()
+                    # Stay on the same concept question
+                    next_question = memory.get_current_question(session_id)
 
             # Stream the mentor's response text to the client
             yield clean_response
