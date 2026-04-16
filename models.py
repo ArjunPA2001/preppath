@@ -153,3 +153,15 @@ class CandidateQuestionHistory(Base):
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
     last_quality = Column(String)   # wrong | partial | correct
     times_seen = Column(Integer, default=1)
+
+
+class SectionCompletion(Base):
+    # A section is "complete" only for the channel it was completed at.
+    # When the candidate advances, no rows match the new channel, so every
+    # section becomes available again without any explicit reset.
+    __tablename__ = "section_completions"
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidates.id"), nullable=False)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=False)
+    channel = Column(String, nullable=False)
+    completed_at = Column(DateTime, default=datetime.utcnow)

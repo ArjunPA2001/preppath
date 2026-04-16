@@ -313,55 +313,50 @@ def chat(session_id: int, body: ChatRequest):
             # Check if gate fires
             gate_fired = topic_gate.check_topic_gate(db, session_id)
 
-            # When gate fires: create an advancement assessment for the candidate to take
-            advancement_assessment_id = None  # set below if gate fires
+            # When gate fires: mark THIS section complete at the current channel.
+            # Path-wide advancement test is only created once every section in the
+            # candidate's learning path has been completed at the current channel
+            # (driven from the Home screen, not inline in chat).
+            all_sections_completed = False
             if gate_fired and session.status == "active":
                 session.status = "ended"
+
+                existing = (
+                    db.query(models.SectionCompletion)
+                    .filter_by(
+                        candidate_id=candidate.id,
+                        section_id=session.section_id,
+                        channel=candidate.channel or "",
+                    )
+                    .first()
+                )
+                if not existing:
+                    db.add(
+                        models.SectionCompletion(
+                            candidate_id=candidate.id,
+                            section_id=session.section_id,
+                            channel=candidate.channel or "",
+                        )
+                    )
                 db.commit()
 
-                # Build advancement test (one question per concept at next-level band)
-                channel = candidate.channel or "foundation"
-                CHANNEL_NEXT_BAND = {
-                    "foundation": "deepdive",
-                    "deepdive": "interview_ready",
-                    "simulation": "interview_ready",
-                    "improvement": "deepdive",
+                # Compute whether every section in the path is now done at this channel
+                path_section_ids = {
+                    s.id
+                    for s in db.query(models.Section)
+                    .filter_by(learning_path_id=candidate.learning_path_id)
+                    .all()
                 }
-                target_band = CHANNEL_NEXT_BAND.get(channel, "deepdive")
-
-                concepts = json.loads(section.concepts or "[]") if section else []
-                adv_question_ids = []
-                for concept in concepts:
-                    q = (
-                        db.query(models.Question)
-                        .filter_by(
-                            section_id=session.section_id,
-                            concept_tag=concept,
-                            difficulty_band=target_band,
-                        )
-                        .first()
-                    )
-                    if not q:
-                        q = (
-                            db.query(models.Question)
-                            .filter_by(section_id=session.section_id, concept_tag=concept)
-                            .first()
-                        )
-                    if q:
-                        adv_question_ids.append(q.id)
-
-                if adv_question_ids:
-                    adv_assessment = models.Assessment(
+                completed_ids = {
+                    c.section_id
+                    for c in db.query(models.SectionCompletion)
+                    .filter_by(
                         candidate_id=candidate.id,
-                        assessment_type="topic_gate",
-                        session_id=session_id,
-                        status="pending",
-                        question_ids=json.dumps(adv_question_ids),
+                        channel=candidate.channel or "",
                     )
-                    db.add(adv_assessment)
-                    db.commit()
-                    db.refresh(adv_assessment)
-                    advancement_assessment_id = adv_assessment.id
+                    .all()
+                }
+                all_sections_completed = bool(path_section_ids) and path_section_ids.issubset(completed_ids)
 
             # Work out what question the frontend should show after this turn.
             # If the answer was correct and we pre-fetched the next concept's question,
@@ -395,7 +390,7 @@ def chat(session_id: int, body: ChatRequest):
                 "required_concepts": json.loads(session.required_concepts or "[]"),
                 "answer_count": session.answer_count,
                 "next_question": next_question,
-                "advancement_assessment_id": advancement_assessment_id,
+                "all_sections_completed": all_sections_completed,
             }
             yield f"\n[META]{json.dumps(meta)}[/META]"
 

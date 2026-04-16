@@ -279,18 +279,33 @@ def get_progress(candidate_id: int, db: DBSession = Depends(get_db)):
         for s in sections_raw
     ]
 
-    # Completed sessions per section (ended sessions where gate fired)
-    completed_section_ids = set()
-    ended_sessions = (
-        db.query(models.Session)
-        .filter_by(candidate_id=candidate_id, status="ended")
+    # Completed sections are scoped to the candidate's CURRENT channel — when the
+    # channel advances, no rows match the new channel so every section is
+    # available again at the higher difficulty band.
+    completed_section_ids = {
+        c.section_id
+        for c in db.query(models.SectionCompletion)
+        .filter_by(candidate_id=candidate_id, channel=candidate.channel or "")
         .all()
+    }
+
+    all_section_ids = {s["id"] for s in sections}
+    ready_for_advancement = (
+        bool(all_section_ids) and all_section_ids.issubset(completed_section_ids)
     )
-    for s in ended_sessions:
-        covered = set(json.loads(s.covered_concepts or "[]"))
-        required = set(json.loads(s.required_concepts or "[]"))
-        if required and required.issubset(covered):
-            completed_section_ids.add(s.section_id)
+
+    # Surface a pending path-wide advancement assessment (if one exists) so the
+    # Home screen can offer a "resume test" link instead of creating duplicates.
+    pending_assessment = (
+        db.query(models.Assessment)
+        .filter_by(
+            candidate_id=candidate_id,
+            assessment_type="topic_gate",
+            status="pending",
+        )
+        .order_by(models.Assessment.created_at.desc())
+        .first()
+    )
 
     active_info = None
     if active_session:
@@ -309,4 +324,6 @@ def get_progress(candidate_id: int, db: DBSession = Depends(get_db)):
         "sections": sections,
         "completed_section_ids": list(completed_section_ids),
         "active_session": active_info,
+        "ready_for_advancement": ready_for_advancement,
+        "pending_advancement_assessment_id": pending_assessment.id if pending_assessment else None,
     }

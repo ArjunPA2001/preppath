@@ -112,14 +112,37 @@ def create_assessment(body: CreateAssessmentRequest, db: DBSession = Depends(get
         questions = [{"question_id": q.id, "text": q.text, "concept_tag": q.concept_tag} for q in qs]
         question_ids = [q.id for q in qs]
     elif body.assessment_type == "topic_gate":
-        # Advancement test: one question per concept at the next-level band
-        if not body.session_id:
-            raise HTTPException(status_code=400, detail="session_id required for topic_gate")
-        session = db.query(models.Session).filter_by(id=body.session_id).first()
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+        # Path-wide advancement test: one question per concept, per section,
+        # at the next-level band. Triggered from the Home screen once every
+        # section has been completed at the current channel.
+        if not candidate.learning_path_id:
+            raise HTTPException(status_code=400, detail="Candidate has no learning path assigned")
 
-        # Determine the target band based on current channel
+        # Reuse an existing pending test instead of creating duplicates.
+        existing = (
+            db.query(models.Assessment)
+            .filter_by(
+                candidate_id=body.candidate_id,
+                assessment_type="topic_gate",
+                status="pending",
+            )
+            .order_by(models.Assessment.created_at.desc())
+            .first()
+        )
+        if existing:
+            existing_ids = json.loads(existing.question_ids or "[]")
+            qs = db.query(models.Question).filter(models.Question.id.in_(existing_ids)).all()
+            q_map = {q.id: q for q in qs}
+            questions = [
+                {"question_id": qid, "text": q_map[qid].text, "concept_tag": q_map[qid].concept_tag}
+                for qid in existing_ids if qid in q_map
+            ]
+            return {
+                "assessment_id": existing.id,
+                "assessment_type": "topic_gate",
+                "questions": questions,
+            }
+
         channel = candidate.channel or "foundation"
         CHANNEL_NEXT_BAND = {
             "foundation": "deepdive",
@@ -129,31 +152,36 @@ def create_assessment(body: CreateAssessmentRequest, db: DBSession = Depends(get
         }
         target_band = CHANNEL_NEXT_BAND.get(channel, "deepdive")
 
-        # One question per concept (prefer target band, fall back to any band)
-        sec = db.query(models.Section).filter_by(id=session.section_id).first()
-        concepts = json.loads(sec.concepts or "[]") if sec else []
+        path_sections = (
+            db.query(models.Section)
+            .filter_by(learning_path_id=candidate.learning_path_id)
+            .order_by(models.Section.order_index)
+            .all()
+        )
+
         questions = []
         question_ids = []
-        for concept in concepts:
-            q = (
-                db.query(models.Question)
-                .filter_by(
-                    section_id=session.section_id,
-                    concept_tag=concept,
-                    difficulty_band=target_band,
-                )
-                .first()
-            )
-            if not q:
-                # Fallback: any band for this concept
+        for sec in path_sections:
+            for concept in json.loads(sec.concepts or "[]"):
                 q = (
                     db.query(models.Question)
-                    .filter_by(section_id=session.section_id, concept_tag=concept)
+                    .filter_by(
+                        section_id=sec.id,
+                        concept_tag=concept,
+                        difficulty_band=target_band,
+                    )
                     .first()
                 )
-            if q:
-                questions.append({"question_id": q.id, "text": q.text, "concept_tag": q.concept_tag})
-                question_ids.append(q.id)
+                if not q:
+                    # Fallback: any band for this concept in this section
+                    q = (
+                        db.query(models.Question)
+                        .filter_by(section_id=sec.id, concept_tag=concept)
+                        .first()
+                    )
+                if q:
+                    questions.append({"question_id": q.id, "text": q.text, "concept_tag": q.concept_tag})
+                    question_ids.append(q.id)
 
         if not questions:
             raise HTTPException(status_code=500, detail="No questions available for advancement test")
