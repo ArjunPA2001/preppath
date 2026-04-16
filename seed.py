@@ -9,8 +9,13 @@ Question seeding strategy:
      (3 bands × 3 types). This runs once on first startup and is skipped on restarts.
 """
 import json
+import bcrypt
 from sqlalchemy.orm import Session
 import models
+
+
+def _hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 # ── Question bank ────────────────────────────────────────────────────────────
@@ -217,8 +222,8 @@ Concepts in scope: http_basics (methods, status codes, idempotency), rest_api_de
 # ── Seed function ────────────────────────────────────────────────────────────
 
 def run_seed(db: Session) -> None:
-    # Idempotency guard
-    if db.query(models.LearningPath).count() > 0:
+    # Idempotency guard — check the first table that gets written
+    if db.query(models.User).count() > 0:
         return
 
     # Learning path
@@ -266,20 +271,49 @@ def run_seed(db: Session) -> None:
     for q in SECTION_2_QUESTIONS:
         db.add(models.Question(section_id=sec2.id, seniority="mid", **q))
 
-    # Candidate
-    candidate = models.Candidate(
-        name="Alex Chen",
-        email="alex@example.com",
-        learning_path_id=path.id,
-        channel="",   # set after preliminary test
-        level="",     # set after preliminary test
-        gaps=json.dumps([]),
-        strengths=json.dumps([]),
-    )
-    db.add(candidate)
+    # Seed users (one of each role)
+    seed_users = [
+        models.User(
+            email="exec@preppath.io",
+            name="Exec Admin",
+            role="executive",
+            hashed_pw=_hash("exec123"),
+        ),
+        models.User(
+            email="feeder@preppath.io",
+            name="Feeder User",
+            role="feeder",
+            hashed_pw=_hash("feeder123"),
+        ),
+        models.User(
+            email="alex@example.com",
+            name="Alex Chen",
+            role="candidate",
+            hashed_pw=_hash("candidate123"),
+        ),
+    ]
+    for u in seed_users:
+        db.add(u)
+    db.flush()
+
+    # Candidate profile linked to the candidate user
+    # alex_user = next(u for u in seed_users if u.email == "alex@example.com")
+    # candidate = models.Candidate(
+    #     user_id=alex_user.id,
+    #     learning_path_id=path.id,
+    #     channel="",   # set after preliminary test
+    #     level="",     # set after preliminary test
+    #     gaps=json.dumps([]),
+    #     strengths=json.dumps([]),
+    # )
+    # db.add(candidate)
 
     db.commit()
-    print("✓ Database seeded: 1 learning path, 2 sections, 18 base questions, 1 candidate")
+    print("✓ Database seeded: 1 learning path, 2 sections, 18 base questions, 3 users, 1 candidate")
+    print("  Seed credentials:")
+    print("    executive  → exec@preppath.io     / exec123")
+    print("    feeder     → feeder@preppath.io   / feeder123")
+    print("    candidate  → alex@example.com     / candidate123")
 
     # ── Expand question pool with the Question Gen Agent ─────────────────────
     # Generates 9 variants per concept (3 bands × 3 types).

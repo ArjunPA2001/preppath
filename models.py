@@ -1,6 +1,16 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float, ForeignKey
 from database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # executive | feeder | candidate
+    hashed_pw = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class LearningPath(Base):
@@ -54,8 +64,7 @@ class Question(Base):
 class Candidate(Base):
     __tablename__ = "candidates"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    email = Column(String, default="")
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     learning_path_id = Column(Integer, ForeignKey("learning_paths.id"), nullable=True)
     # Channel the candidate is currently in
     channel = Column(String, default="")  # foundation | deepdive | simulation | improvement
@@ -66,6 +75,8 @@ class Candidate(Base):
     # Saved before entering improvement channel so we can return
     pre_improvement_channel = Column(String, nullable=True)
     interview_ready = Column(Boolean, default=False)
+    # 0–100 composite readiness score updated after each advancement assessment
+    readiness_score = Column(Float, nullable=True)
     plan_id = Column(Integer, ForeignKey("candidate_plans.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

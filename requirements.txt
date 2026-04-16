@@ -4,3 +4,4 @@ sqlalchemy
 openai
 python-multipart
 python-dotenv
+bcrypt

@@ -23,8 +23,7 @@ router = APIRouter()
 # ── Request schemas ──────────────────────────────────────────────────────────
 
 class CreateCandidateRequest(BaseModel):
-    name: str
-    email: str = ""
+    user_id: int
 
 
 class AssignPipelineRequest(BaseModel):
@@ -33,11 +32,12 @@ class AssignPipelineRequest(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _candidate_dict(c: models.Candidate) -> dict:
+def _candidate_dict(c: models.Candidate, user: models.User | None = None) -> dict:
     return {
         "id": c.id,
-        "name": c.name,
-        "email": c.email,
+        "user_id": c.user_id,
+        "name": user.name if user else "",
+        "email": user.email if user else "",
         "learning_path_id": c.learning_path_id,
         "channel": c.channel,
         "level": c.level,
@@ -45,18 +45,42 @@ def _candidate_dict(c: models.Candidate) -> dict:
         "strengths": json.loads(c.strengths or "[]"),
         "pre_improvement_channel": c.pre_improvement_channel,
         "interview_ready": c.interview_ready,
+        "readiness_score": c.readiness_score,
         "plan_id": c.plan_id,
     }
+
+
+def _user_for(db, candidate: models.Candidate) -> models.User | None:
+    return db.query(models.User).filter_by(id=candidate.user_id).first() if candidate.user_id else None
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("")
 def create_candidate(body: CreateCandidateRequest, db: DBSession = Depends(get_db)):
-    """Create a new candidate. Learning path is assigned separately via PUT /pipeline."""
+    """
+    Create a candidate profile for an existing user with role=candidate.
+    Note: creating a user via POST /users with role=candidate does this automatically.
+    Use this endpoint only when you need to manually create a candidate profile for an
+    existing user (e.g. after changing their role to candidate via PUT /users/{id}).
+    """
+    user = db.query(models.User).filter_by(id=body.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role != "candidate":
+        raise HTTPException(
+            status_code=400,
+            detail=f"User '{user.email}' has role '{user.role}', not 'candidate'",
+        )
+    existing = db.query(models.Candidate).filter_by(user_id=body.user_id).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A candidate profile already exists for user {body.user_id}",
+        )
+
     candidate = models.Candidate(
-        name=body.name,
-        email=body.email,
+        user_id=body.user_id,
         channel="",
         level="",
         gaps=json.dumps([]),
@@ -65,7 +89,7 @@ def create_candidate(body: CreateCandidateRequest, db: DBSession = Depends(get_d
     db.add(candidate)
     db.commit()
     db.refresh(candidate)
-    return _candidate_dict(candidate)
+    return _candidate_dict(candidate, user)
 
 
 @router.get("")
@@ -73,17 +97,23 @@ def list_candidates(db: DBSession = Depends(get_db)):
     """List all candidates with their current channel and readiness state."""
     candidates = db.query(models.Candidate).order_by(models.Candidate.id).all()
 
-    # Build a name lookup for learning paths
+    # Build lookups
     path_ids = {c.learning_path_id for c in candidates if c.learning_path_id}
     paths = {}
     if path_ids:
         for lp in db.query(models.LearningPath).filter(models.LearningPath.id.in_(path_ids)).all():
             paths[lp.id] = lp.name
 
+    user_ids = {c.user_id for c in candidates if c.user_id}
+    users = {}
+    if user_ids:
+        for u in db.query(models.User).filter(models.User.id.in_(user_ids)).all():
+            users[u.id] = u
+
     return {
         "candidates": [
             {
-                **_candidate_dict(c),
+                **_candidate_dict(c, users.get(c.user_id)),
                 "learning_path_name": paths.get(c.learning_path_id, "") if c.learning_path_id else "",
             }
             for c in candidates
@@ -96,7 +126,7 @@ def get_candidate(candidate_id: int, db: DBSession = Depends(get_db)):
     candidate = db.query(models.Candidate).filter_by(id=candidate_id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return _candidate_dict(candidate)
+    return _candidate_dict(candidate, _user_for(db, candidate))
 
 
 @router.put("/{candidate_id}/pipeline")
@@ -148,10 +178,12 @@ def assign_pipeline(
     ]
     questions = build_preliminary_test(db, section_ids=path_section_ids)
 
+    user = _user_for(db, candidate)
+
     if not questions:
         # Path has no preliminary questions yet — still assign but warn
         return {
-            "candidate": _candidate_dict(candidate),
+            "candidate": _candidate_dict(candidate, user),
             "preliminary_assessment_id": None,
             "warning": "No preliminary questions found for this path. Publish the path to generate questions.",
         }
@@ -181,7 +213,7 @@ def assign_pipeline(
     db.refresh(assessment)
 
     return {
-        "candidate": _candidate_dict(candidate),
+        "candidate": _candidate_dict(candidate, user),
         "preliminary_assessment_id": assessment.id,
         "preliminary_questions": questions,
         "message": f"Learning path '{lp.name}' assigned. Preliminary test is ready.",
@@ -245,7 +277,7 @@ def get_progress(candidate_id: int, db: DBSession = Depends(get_db)):
         }
 
     return {
-        "candidate": _candidate_dict(candidate),
+        "candidate": _candidate_dict(candidate, _user_for(db, candidate)),
         "sections": sections,
         "completed_section_ids": list(completed_section_ids),
         "active_session": active_info,
