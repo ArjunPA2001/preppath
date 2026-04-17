@@ -47,6 +47,10 @@ class Section(Base):
     concepts = Column(Text, default="[]")
     # Free text rubric used by the evaluator agent
     rubric = Column(Text, default="")
+    # JSON list of raw sample question strings provided by the feeder.
+    # On publish these are tagged by the LLM and written to the questions table
+    # as real questions, and also used as style examples for question generation.
+    sample_questions = Column(Text, default="[]")
 
 
 class Question(Base):

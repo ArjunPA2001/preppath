@@ -38,6 +38,7 @@ class CreateSectionRequest(BaseModel):
     name: str
     description: str = ""
     concepts: list[str] = []
+    sample_questions: list[str] = []
 
 
 class CreatePatternRequest(BaseModel):
@@ -69,6 +70,7 @@ def _serialize_path(lp: models.LearningPath, db: DBSession) -> dict:
             "description": s.description,
             "concepts": json.loads(s.concepts or "[]"),
             "rubric": s.rubric or "",
+            "sample_questions": json.loads(s.sample_questions or "[]"),
             "patterns": [
                 {
                     "id": p.id,
@@ -147,11 +149,27 @@ def add_section(pipeline_id: int, body: CreateSectionRequest, db: DBSession = De
         description=body.description,
         order_index=existing_count,
         concepts=json.dumps(body.concepts),
+        sample_questions=json.dumps(body.sample_questions),
     )
     db.add(sec)
     db.commit()
     db.refresh(sec)
     return {"id": sec.id, "name": sec.name, "order_index": sec.order_index}
+
+
+@router.put("/sections/{section_id}")
+def update_section(section_id: int, body: CreateSectionRequest, db: DBSession = Depends(get_db)):
+    """Update a section's name, description, concepts, and sample questions."""
+    sec = db.query(models.Section).filter_by(id=section_id).first()
+    if not sec:
+        raise HTTPException(status_code=404, detail="Section not found")
+    sec.name = body.name
+    sec.description = body.description
+    sec.concepts = json.dumps(body.concepts)
+    sec.sample_questions = json.dumps(body.sample_questions)
+    db.commit()
+    db.refresh(sec)
+    return {"id": sec.id, "name": sec.name}
 
 
 @router.post("/sections/{section_id}/patterns")

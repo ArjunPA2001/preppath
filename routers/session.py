@@ -125,16 +125,32 @@ def create_session(body: CreateSessionRequest, db: DBSession = Depends(get_db)):
     db.commit()
     db.refresh(session)
 
-    # Pick the first question
-    band = question_selector.select_band(candidate.channel, last_quality=None)
+    # Resolve path seniority — used for question selection throughout this session
+    lp = (
+        db.query(models.LearningPath).filter_by(id=candidate.learning_path_id).first()
+        if candidate.learning_path_id else None
+    )
+    path_seniority = lp.seniority if lp else "mid"
+
+    # Load the personalised plan (if it exists) for difficulty_start overrides
+    difficulty_start = {}
+    if candidate.plan_id:
+        plan = db.query(models.CandidatePlan).filter_by(id=candidate.plan_id).first()
+        if plan:
+            difficulty_start = json.loads(plan.difficulty_start or "{}")
+
+    # Pick the first question — use difficulty_start if the plan specifies a
+    # starting band for this concept, otherwise fall back to channel default.
+    default_band = question_selector.select_band(candidate.channel, last_quality=None)
     first_concept = required[0] if required else all_concepts[0]
+    band = difficulty_start.get(first_concept, default_band)
     first_question = question_selector.fetch_question(
         db=db,
         candidate_id=candidate.id,
         session_id=session.id,
         concept_tag=first_concept,
         band=band,
-        seniority=candidate.learning_path_id and "mid" or "mid",
+        seniority=path_seniority,
     )
 
     session.current_concept_tag = first_concept
@@ -198,6 +214,22 @@ def chat(session_id: int, body: ChatRequest):
 
             section = db.query(models.Section).filter_by(id=session.section_id).first()
 
+            # Resolve path seniority once per turn — drives question selection
+            _lp = (
+                db.query(models.LearningPath).filter_by(id=candidate.learning_path_id).first()
+                if candidate.learning_path_id else None
+            )
+            path_seniority = _lp.seniority if _lp else "mid"
+
+            # Load the personalised plan for difficulty_start + concept_weights
+            difficulty_start = {}
+            concept_weights = {}
+            if candidate.plan_id:
+                _plan = db.query(models.CandidatePlan).filter_by(id=candidate.plan_id).first()
+                if _plan:
+                    difficulty_start = json.loads(_plan.difficulty_start or "{}")
+                    concept_weights = json.loads(_plan.concept_weights or "{}")
+
             # Determine last quality from previous answers in this session
             last_answer = (
                 db.query(models.SessionAnswer)
@@ -225,6 +257,7 @@ def chat(session_id: int, body: ChatRequest):
                     session_id=session_id,
                     concept_tag=concept_tag,
                     band=band,
+                    seniority=path_seniority,
                 )
                 if fetched:
                     cached_q = {"id": fetched.id, "text": fetched.text, "concept_tag": fetched.concept_tag}
@@ -250,13 +283,15 @@ def chat(session_id: int, body: ChatRequest):
                     anticipated_next_concept = c
                     break
             if anticipated_next_concept and anticipated_next_concept != concept_tag:
-                next_band = question_selector.select_band(candidate.channel, last_quality)
+                default_next_band = question_selector.select_band(candidate.channel, None)
+                next_band = difficulty_start.get(anticipated_next_concept, default_next_band)
                 anticipated_next_q = question_selector.fetch_question(
                     db=db,
                     candidate_id=candidate.id,
                     session_id=session_id,
                     concept_tag=anticipated_next_concept,
                     band=next_band,
+                    seniority=path_seniority,
                 )
 
             # Call Mentor Agent (collects full response, then returns)
@@ -303,8 +338,11 @@ def chat(session_id: int, body: ChatRequest):
             )
             db.commit()
 
-            # Update topic gate
-            topic_gate.record_answer_signal(db, session_id, sig_concept, sig_quality)
+            # Update topic gate (concept_weights control how many correct answers
+            # are needed before a concept counts as "covered")
+            topic_gate.record_answer_signal(
+                db, session_id, sig_concept, sig_quality, concept_weights
+            )
 
             # Update candidate question history
             if question_id:

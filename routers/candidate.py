@@ -262,13 +262,22 @@ def get_progress(candidate_id: int, db: DBSession = Depends(get_db)):
         .first()
     )
 
-    # All sections for the candidate's learning path (in order)
+    # All sections for the candidate's learning path
     sections_raw = (
         db.query(models.Section)
         .filter_by(learning_path_id=candidate.learning_path_id)
         .order_by(models.Section.order_index)
         .all()
     )
+
+    # If a personalised plan exists, sort sections by the plan's section_order
+    # (gap-heavy sections first). Fall back to DB order_index.
+    if candidate.plan_id:
+        plan = db.query(models.CandidatePlan).filter_by(id=candidate.plan_id).first()
+        if plan:
+            order = json.loads(plan.section_order or "[]")
+            order_map = {sid: idx for idx, sid in enumerate(order)}
+            sections_raw = sorted(sections_raw, key=lambda s: order_map.get(s.id, 999))
 
     sections = [
         {

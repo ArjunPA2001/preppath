@@ -143,14 +143,19 @@ def create_assessment(body: CreateAssessmentRequest, db: DBSession = Depends(get
                 "questions": questions,
             }
 
-        channel = candidate.channel or "foundation"
+        # Improvement candidates are trying to return to (and advance past)
+        # their pre-improvement channel — pick the band accordingly.
+        effective_channel = (
+            candidate.pre_improvement_channel
+            if candidate.channel == "improvement" and candidate.pre_improvement_channel
+            else (candidate.channel or "foundation")
+        )
         CHANNEL_NEXT_BAND = {
             "foundation": "deepdive",
             "deepdive": "interview_ready",
             "simulation": "interview_ready",
-            "improvement": "deepdive",
         }
-        target_band = CHANNEL_NEXT_BAND.get(channel, "deepdive")
+        target_band = CHANNEL_NEXT_BAND.get(effective_channel, "deepdive")
 
         path_sections = (
             db.query(models.Section)
@@ -288,6 +293,7 @@ def submit_assessment(
     candidate_context = {
         "level": candidate.level or "mid",
         "channel": candidate.channel or "foundation",
+        "pre_improvement_channel": candidate.pre_improvement_channel,
         "gaps": json.loads(candidate.gaps or "[]"),
         "strengths": json.loads(candidate.strengths or "[]"),
     }

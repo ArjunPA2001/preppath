@@ -53,6 +53,7 @@ def _build_generation_prompt(
     seniority: str,
     existing_texts: list[str],
     needs_preliminary: bool,
+    sample_examples: list[str] | None = None,
 ) -> str:
     existing_block = (
         "Existing questions to avoid duplicating:\n" +
@@ -60,6 +61,15 @@ def _build_generation_prompt(
         if existing_texts
         else "No existing questions yet."
     )
+
+    examples_block = ""
+    if sample_examples:
+        examples_block = (
+            "\nStyle examples (questions provided by the domain expert — "
+            "match their phrasing style, depth, and domain vocabulary):\n" +
+            "\n".join(f"  - {t}" for t in sample_examples) +
+            "\n"
+        )
 
     preliminary_note = (
         'Mark is_preliminary=true on exactly ONE question: the foundational + conceptual combination.'
@@ -77,7 +87,7 @@ Generate exactly 9 questions — one for EACH combination of the 3 bands × 3 ty
   types: conceptual, scenario, problem_solving
 
 {existing_block}
-
+{examples_block}
 {preliminary_note}
 
 Return ONLY a JSON array with exactly 9 objects:
@@ -93,6 +103,130 @@ Return ONLY a JSON array with exactly 9 objects:
 ]"""
 
 
+_TAG_SYSTEM = """You are an expert technical question classifier for a software engineering mentoring platform.
+
+Your job is to tag raw question strings with structured metadata so they can be stored in a question bank.
+
+You MUST respond with ONLY a valid JSON array. No markdown, no explanation, no extra text."""
+
+
+def tag_and_save_samples(
+    db: DBSession,
+    section: models.Section,
+    sample_texts: list[str],
+    seniority: str = "mid",
+) -> list[str]:
+    """
+    Tag a list of raw sample question strings with concept_tag, difficulty_band,
+    pattern_type, and seniority using the LLM, then save them to the questions table.
+
+    Returns the list of sample question texts (even ones that failed tagging) so
+    they can be passed as style examples to generate_for_concept().
+    """
+    if not sample_texts:
+        return []
+
+    concepts = json.loads(section.concepts or "[]")
+    if not concepts:
+        print(f"  [question_gen] No concepts on section {section.id} — skipping sample tagging")
+        return sample_texts
+
+    numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(sample_texts))
+
+    prompt = f"""Tag the following sample questions for the learning section below.
+
+Section: {section.name}
+Description: {section.description or ""}
+Valid concept_tags (pick EXACTLY one from this list per question): {concepts}
+Seniority level: {seniority}
+
+Rules:
+- concept_tag: MUST be one of the listed valid tags
+- difficulty_band: "foundational" | "deepdive" | "interview_ready"
+- pattern_type: "conceptual" | "scenario" | "problem_solving"
+- Preserve the original question text exactly
+
+Sample questions to tag:
+{numbered}
+
+Return ONLY a JSON array with one object per question:
+[
+  {{
+    "text": "exact original question text",
+    "concept_tag": "one_from_valid_list",
+    "difficulty_band": "foundational|deepdive|interview_ready",
+    "pattern_type": "conceptual|scenario|problem_solving"
+  }}
+]"""
+
+    try:
+        response = _client.chat.completions.create(
+            model=_MODEL,
+            max_tokens=1024,
+            messages=[
+                {"role": "system", "content": _TAG_SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+        tagged = json.loads(raw)
+    except Exception as e:
+        print(f"  [question_gen] Sample tagging failed for section {section.id}: {e}")
+        return sample_texts  # still return texts for style examples
+
+    added = 0
+    for q in tagged:
+        concept_tag = q.get("concept_tag", "")
+        band = q.get("difficulty_band", "")
+        ptype = q.get("pattern_type", "")
+        text = q.get("text", "").strip()
+
+        if not text or concept_tag not in concepts or not band or not ptype:
+            continue
+
+        # Avoid inserting a duplicate of an already-existing question
+        exists = (
+            db.query(models.Question)
+            .filter_by(section_id=section.id, concept_tag=concept_tag, text=text)
+            .first()
+        )
+        if exists:
+            continue
+
+        # Determine is_preliminary: first foundational+conceptual per concept gets the flag
+        has_prelim = (
+            db.query(models.Question)
+            .filter_by(section_id=section.id, concept_tag=concept_tag, is_preliminary=True)
+            .first()
+            is not None
+        )
+        is_prelim = (not has_prelim) and band == "foundational" and ptype == "conceptual"
+
+        db.add(
+            models.Question(
+                section_id=section.id,
+                concept_tag=concept_tag,
+                text=text,
+                difficulty_band=band,
+                pattern_type=ptype,
+                seniority=seniority,
+                is_preliminary=is_prelim,
+            )
+        )
+        added += 1
+
+    if added:
+        db.commit()
+        print(f"  [question_gen] section {section.id}: saved {added} sample questions")
+
+    return sample_texts  # return originals as style examples
+
+
 _RUBRIC_SYSTEM = """You are an expert evaluator for a software engineering mentoring platform.
 
 Write a concise evaluation rubric for a section. The rubric will be read by an AI evaluator to grade candidate answers.
@@ -105,10 +239,15 @@ def generate_for_concept(
     concept_tag: str,
     section: models.Section,
     seniority: str = "mid",
+    sample_examples: list[str] | None = None,
 ) -> int:
     """
     Generate 9 questions for a concept and save them to the DB.
     Skips combinations that already exist to avoid duplication.
+
+    sample_examples: optional list of question texts (from the feeder's sample
+    questions) passed to the LLM as style guidance.
+
     Returns the number of new questions added.
     """
     # Gather existing questions for this concept (for dedup context)
@@ -137,6 +276,7 @@ def generate_for_concept(
         seniority=seniority,
         existing_texts=existing_texts,
         needs_preliminary=not has_preliminary,
+        sample_examples=sample_examples or [],
     )
 
     try:
@@ -267,25 +407,40 @@ def generate_for_section(db: DBSession, section: models.Section) -> dict:
     """
     Convenience wrapper: generate questions for ALL concepts in a section
     and (re)generate the rubric. Updates section.rubric in the DB.
+
+    Order of operations:
+      1. Tag and save sample questions (feeder-provided) — they become real DB
+         questions and serve as style examples for the generator.
+      2. Generate 9 questions per concept, passing sample texts as style hints.
+      3. (Re)generate the section rubric.
+
     Returns a summary dict.
     """
     concepts = json.loads(section.concepts or "[]")
-    seniority = "mid"  # could be pulled from the learning path if needed
+    seniority = "mid"
 
-    # Try to get seniority from the learning path
-    from sqlalchemy.orm import Session as DBSession  # avoid circular at module level
     lp = db.query(models.LearningPath).filter_by(id=section.learning_path_id).first()
     if lp:
         seniority = lp.seniority
 
+    # Step 1: tag and persist sample questions; get back the texts as style examples
+    raw_samples = json.loads(section.sample_questions or "[]")
+    sample_examples = tag_and_save_samples(db, section, raw_samples, seniority)
+
+    # Step 2: generate the full question bank, guided by the sample style
     total_added = 0
     for concept in concepts:
-        added = generate_for_concept(db, concept, section, seniority)
+        added = generate_for_concept(db, concept, section, seniority, sample_examples)
         total_added += added
 
-    # Regenerate rubric
+    # Step 3: (re)generate rubric
     rubric = generate_rubric(section.name, section.description or "", concepts, seniority)
     section.rubric = rubric
     db.commit()
 
-    return {"section_id": section.id, "concepts": concepts, "questions_added": total_added}
+    return {
+        "section_id": section.id,
+        "concepts": concepts,
+        "samples_processed": len(raw_samples),
+        "questions_added": total_added,
+    }

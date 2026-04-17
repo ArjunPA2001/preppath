@@ -7,8 +7,15 @@ Rules (from architecture):
   - quality="wrong" does NOT count toward coverage (must show partial/correct understanding)
   - For improvement channel sessions, required_concepts is set to the gap concepts only
     (handled at session creation time in the router — not here)
+
+Concept weights (from the personalised plan):
+  - weight 2.0 → concept needs 2 correct answers before it counts as covered
+  - weight 1.0 → 1 correct answer (default)
+  - weight 0.5 → 1 correct answer (minimum)
+  Higher-weight concepts are the candidate's gaps — the mentor stays on them longer.
 """
 import json
+import math
 from sqlalchemy.orm import Session as DBSession
 import models
 
@@ -21,10 +28,14 @@ def record_answer_signal(
     session_id: int,
     concept_tag: str,
     quality: str,
+    concept_weights: dict[str, float] | None = None,
 ) -> None:
     """
     Called after every chat turn. Updates the session's covered concepts
     and answer count based on the signal the mentor agent emitted.
+
+    concept_weights: from the candidate's personalised plan. A concept with
+    weight 2.0 needs 2 correct answers before being marked covered.
     """
     session = db.query(models.Session).filter_by(id=session_id).first()
     if not session:
@@ -32,13 +43,23 @@ def record_answer_signal(
 
     session.answer_count += 1
 
-    # Only mark a concept covered when the mentor explicitly signals full understanding.
-    # "partial" means the candidate is on track but the mentor should keep working on it.
-    # "wrong" means stay on the same concept entirely.
     if quality == "correct":
         covered = set(json.loads(session.covered_concepts))
-        covered.add(concept_tag)
-        session.covered_concepts = json.dumps(list(covered))
+        if concept_tag not in covered:
+            weight = (concept_weights or {}).get(concept_tag, 1.0)
+            required_correct = max(1, math.ceil(weight))
+
+            # Count how many correct answers already exist for this concept
+            # (the current answer was committed before this function is called)
+            correct_count = (
+                db.query(models.SessionAnswer)
+                .filter_by(session_id=session_id, concept_tag=concept_tag, quality="correct")
+                .count()
+            )
+
+            if correct_count >= required_correct:
+                covered.add(concept_tag)
+                session.covered_concepts = json.dumps(list(covered))
 
     session.current_concept_tag = concept_tag
     db.commit()

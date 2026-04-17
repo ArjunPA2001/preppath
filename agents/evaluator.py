@@ -19,14 +19,20 @@ from agents.llm import client as _client, FAST_MODEL as _MODEL
 
 _SYSTEM_PROMPT = """You are a strict but fair technical evaluator for a software engineering mentoring platform.
 
-Your job is to evaluate a candidate's answers and assign them to the right learning channel.
+Your job is to score the candidate's answers. The system (not you) decides the final channel
+based on your scores and the candidate's current state.
 
-Channel thresholds:
-- foundation:  accuracy >= 60  AND fluency >= 50   (needs foundational teaching)
-- deepdive:    accuracy >= 75  AND depth >= 65  AND fluency >= 65  (ready for depth)
-- simulation:  accuracy >= 85  AND depth >= 80  AND fluency >= 75  (interview-ready)
-- improvement: assign when specific concept clusters are critically weak (accuracy < 50 for that concept)
-               even if overall scores are decent — improvement is a temporary detour
+Channel thresholds (used by the system to decide final channel):
+- foundation:  accuracy >= 60  AND fluency >= 50
+- deepdive:    accuracy >= 75  AND depth >= 65  AND fluency >= 65
+- simulation:  accuracy >= 85  AND depth >= 80  AND fluency >= 75
+
+Pick the highest channel whose thresholds your scores support — this is your best guess
+at the candidate's current competence. Do NOT output "improvement"; the system routes
+candidates into improvement automatically based on thresholds.
+
+Always populate "gaps" with the specific concept_tag values the candidate struggled with.
+These drive targeted improvement sessions — empty or vague gaps hurt the candidate.
 
 Level assignment:
 - junior:  overall accuracy < 60
@@ -38,7 +44,7 @@ You MUST respond with ONLY a valid JSON object. No explanation, no markdown, no 
 JSON format:
 {
   "level": "junior|mid|senior",
-  "channel": "foundation|deepdive|simulation|improvement",
+  "channel": "foundation|deepdive|simulation",
   "gaps": ["concept_tag", ...],
   "strengths": ["concept_tag", ...],
   "scores": {"accuracy": 0-100, "fluency": 0-100, "depth": 0-100},
@@ -72,67 +78,73 @@ def _build_user_message(
     return "\n".join(lines)
 
 
-_CHANNEL_ORDER = ["foundation", "deepdive", "simulation"]
+_CHANNEL_THRESHOLDS = {
+    "foundation": {"accuracy": 60, "depth": 0, "fluency": 50},
+    "deepdive": {"accuracy": 75, "depth": 65, "fluency": 65},
+    "simulation": {"accuracy": 85, "depth": 80, "fluency": 75},
+}
+
+# The channel an advancement test is trying to move the candidate INTO.
+# simulation is terminal — a mock interview that passes keeps the candidate there.
+_NEXT_CHANNEL = {
+    "foundation": "deepdive",
+    "deepdive": "simulation",
+    "simulation": "simulation",
+}
 
 
-def _enforce_thresholds(result: dict, current_channel: str, assessment_type: str) -> dict:
+def _meets(scores: dict, target: str) -> bool:
+    t = _CHANNEL_THRESHOLDS[target]
+    return (
+        scores.get("accuracy", 0) >= t["accuracy"]
+        and scores.get("depth", 0) >= t["depth"]
+        and scores.get("fluency", 0) >= t["fluency"]
+    )
+
+
+def _enforce_thresholds(
+    result: dict,
+    current_channel: str,
+    assessment_type: str,
+    pre_improvement_channel: str | None,
+) -> dict:
     """
-    Override the LLM's channel suggestion with a deterministic score-based decision.
+    Decide the final channel deterministically.
 
-    Thresholds (from SDD §7):
-      simulation:  accuracy >= 85, depth >= 80, fluency >= 75
-      deepdive:    accuracy >= 75, depth >= 65, fluency >= 65
-      foundation:  accuracy >= 60,              fluency >= 50
-      improvement: any concept cluster critically weak (LLM flags this)
-      regression:  deepdive → foundation if accuracy < 55
-                   simulation → deepdive on significant regression (accuracy < 70 or depth < 65)
+    preliminary_test: calibrate directly — pick the highest channel whose thresholds are met.
+    topic_gate / mock_interview:
+      - Target channel = next channel above the candidate's "home" channel.
+        If currently in improvement, home = pre_improvement_channel.
+      - If scores meet the target's threshold → advance to target.
+      - Otherwise → route into improvement (no regression).
 
-    For topic_gate / mock_interview: cap advancement at one step per session.
-    For preliminary_test: free to assign any channel directly.
+    Improvement is NEVER LLM-driven anymore. It is entered automatically whenever
+    a candidate fails their advancement bar, so they retry with focus on gaps.
     """
     scores = result.get("scores", {})
-    acc = scores.get("accuracy", 0)
-    dep = scores.get("depth", 0)
-    flu = scores.get("fluency", 0)
-    llm_channel = result.get("channel", "foundation")
 
-    # Compute score-based target channel
-    if acc >= 85 and dep >= 80 and flu >= 75:
-        score_channel = "simulation"
-    elif acc >= 75 and dep >= 65 and flu >= 65:
-        score_channel = "deepdive"
-    elif acc >= 60 and flu >= 50:
-        score_channel = "foundation"
-    else:
-        # Below foundation threshold
-        score_channel = "foundation"
-
-    # Improvement is a concept-level detour — respect LLM's call
-    # (LLM has per-answer context we don't have here)
-    if llm_channel == "improvement" and result.get("gaps"):
-        result["channel"] = "improvement"
+    if assessment_type == "preliminary_test":
+        if _meets(scores, "simulation"):
+            result["channel"] = "simulation"
+        elif _meets(scores, "deepdive"):
+            result["channel"] = "deepdive"
+        else:
+            result["channel"] = "foundation"
         return result
 
-    # Apply regression for topic_gate / mock_interview
-    if assessment_type in ("topic_gate", "mock_interview"):
-        if current_channel == "deepdive" and acc < 55:
-            result["channel"] = "foundation"
-            return result
-        if current_channel == "simulation" and (acc < 70 or dep < 65):
-            result["channel"] = "deepdive"
-            return result
+    # topic_gate / mock_interview
+    home = (
+        pre_improvement_channel
+        if current_channel == "improvement" and pre_improvement_channel
+        else (current_channel or "foundation")
+    )
+    target = _NEXT_CHANNEL.get(home, "deepdive")
 
-        # Cap advancement at one step per session
-        if current_channel in _CHANNEL_ORDER and score_channel in _CHANNEL_ORDER:
-            curr_idx = _CHANNEL_ORDER.index(current_channel)
-            tgt_idx = _CHANNEL_ORDER.index(score_channel)
-            if tgt_idx > curr_idx + 1:
-                score_channel = _CHANNEL_ORDER[curr_idx + 1]
-            # Never regress more than one step
-            if tgt_idx < curr_idx - 1:
-                score_channel = _CHANNEL_ORDER[curr_idx - 1]
+    if _meets(scores, target):
+        result["channel"] = target
+    else:
+        result["channel"] = "improvement"
 
-    result["channel"] = score_channel
     return result
 
 
@@ -156,6 +168,7 @@ def evaluate(
     """
     user_msg = _build_user_message(assessment_type, qa_pairs, candidate_context, rubric)
     current_channel = candidate_context.get("channel", "foundation") or "foundation"
+    pre_improvement_channel = candidate_context.get("pre_improvement_channel")
 
     try:
         response = _client.chat.completions.create(
@@ -178,7 +191,9 @@ def evaluate(
         result.setdefault("feedback", "Evaluation complete.")
 
         # Deterministically enforce channel thresholds — LLM scores, Python decides channel
-        result = _enforce_thresholds(result, current_channel, assessment_type)
+        result = _enforce_thresholds(
+            result, current_channel, assessment_type, pre_improvement_channel
+        )
 
         # Derive level from accuracy score
         acc = result["scores"].get("accuracy", 0)
